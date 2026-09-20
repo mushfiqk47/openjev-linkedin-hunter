@@ -6,11 +6,14 @@ Paste this into your next agent session to resume exactly where we left off.
 
 ## Latest Change (2026-09-21)
 
-- **Live thread pre-check (duplicate guard at the source of truth).** Before every send, `outreach/dispatch.py` now runs `check_existing_thread()` — it opens the contact's conversation (compose URL, or profile → Message) via the new `THREAD_CHECK_JS` template and counts existing messages. If the thread already has messages, the contact is logged **`SKIPPED`** and nothing is inserted/sent. This catches what the ledger cannot (cleared history, messages sent from another device, manually-started conversations).
-- **New status `SKIPPED`** lives in `ledger.DONE_STATUSES` (`SENT`, `UNKNOWN`, `SKIPPED`) → never retried, and it consumes **no** daily quota. `python agent.py status` now prints a Skipped count.
-- **New config keys** in `data/.env`: `THREAD_CHECK` (default `1`) and `THREAD_CHECK_STRICT` (default `0`; `1` also skips inconclusive checks).
-- **Connections page "see all"**: `CONNECTIONS_LINKS_JS` scrolls 4× to lazy-load more cards before scraping (People Search fallback unchanged).
-- **Tests: 48 now** (was 38) — added thread-check decision/parse/template coverage and SKIPPED dedup. Run `python agent.py selftest`.
+- **SemIf Decision Backend Integration (LM Studio / qwen3.5-4b).** The outreach agent now connects to `backend/src/semif_phase1` to evaluate contact relevance and classify persona archetypes (`recruiter`, `founder`, `peer`, `general`) in a sub-300ms forward pass using native logprobs:
+  - **Zero-Cost BM25 Prescreen**: Disqualifies non-relevant careers (<1ms) before calling the model.
+  - **Relevance Filtering**: Low-relevance contacts (<50%) are skipped before dispatch to conserve the daily 15-send budget.
+  - **Persona-Calibrated Templates**: Dynamically selects `MESSAGE_RECRUITER`, `MESSAGE_FOUNDER`, or `MESSAGE_PEER` from `data/message.py`.
+  - **Graceful Fallback**: If LM Studio is offline or disabled (`SEMIF_ENABLED=0`), the engine seamlessly falls back to deterministic keyword heuristics.
+- **Live thread pre-check (duplicate guard at the source of truth).** Before every send, `outreach/dispatch.py` runs `check_existing_thread()` and logs **`SKIPPED`** if the thread already has messages.
+- **New config keys** in `data/.env`: `SEMIF_ENABLED`, `SEMIF_BASE_URL`, `SEMIF_MODEL`, `MIN_RELEVANCE_SCORE`, `FILTER_LOW_RELEVANCE`.
+- **Tests: 55 now** (was 48) — added BM25 prescreen, heuristic evaluation, mocked SemIf Judge, and archetype message selection tests. Run `python agent.py selftest`.
 
 ---
 

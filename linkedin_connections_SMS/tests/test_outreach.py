@@ -393,5 +393,93 @@ class TestRealLedger(unittest.TestCase):
         self.assertTrue(all(e["status"] in ("SENT", "FAILED", "UNKNOWN", "SKIPPED") for e in entries))
 
 
+class TestEvaluator(unittest.TestCase):
+    def test_bm25_prescreen_disqualifies(self):
+        from outreach.evaluator import bm25_prescreen
+        res = bm25_prescreen("Senior Radiologist at Hospital")
+        self.assertIsNotNone(res)
+        self.assertEqual(res["archetype"], "disqualified")
+        self.assertEqual(res["relevance"], 10)
+
+    def test_bm25_prescreen_passes_relevant(self):
+        from outreach.evaluator import bm25_prescreen
+        self.assertIsNone(bm25_prescreen("Product Designer at TechCorp"))
+        self.assertIsNone(bm25_prescreen("Technical Recruiter at Startup"))
+
+    def test_heuristic_evaluates_archetypes(self):
+        from outreach.evaluator import heuristic_evaluate
+        r1 = heuristic_evaluate("Alice", "Head of Talent Acquisition")
+        self.assertEqual(r1["archetype"], "recruiter")
+        self.assertGreaterEqual(r1["relevance"], 90)
+
+        r2 = heuristic_evaluate("Bob", "Co-Founder & CEO")
+        self.assertEqual(r2["archetype"], "founder")
+        self.assertGreaterEqual(r2["relevance"], 85)
+
+        r3 = heuristic_evaluate("Charlie", "Senior UI/UX Designer")
+        self.assertEqual(r3["archetype"], "peer")
+        self.assertGreaterEqual(r3["relevance"], 80)
+
+    def test_mocked_semif_judge(self):
+        from outreach.evaluator import SemIfJudge
+        fake_client = object()
+        fake_meta = {"source": "fake", "backend": "injected"}
+
+        judge = SemIfJudge(client=fake_client, meta=fake_meta)
+        with patch("outreach.evaluator.score") as mock_score:
+            mock_score.return_value = {
+                "option_ids": ["recruiter", "founder", "peer", "general"],
+                "probabilities": [0.92, 0.04, 0.02, 0.02],
+                "forward_seconds": 0.05,
+            }
+            archetype, prob = judge.classify_archetype("Jane Doe", "Technical Sourcer")
+            self.assertEqual(archetype, "recruiter")
+            self.assertAlmostEqual(prob, 0.92)
+
+
+class TestArchetypeMessaging(unittest.TestCase):
+    def test_recruiter_template_used(self):
+        contact = {"name": "Jane", "headline": "Talent Partner", "archetype": "recruiter"}
+        msg = build_message("Jane", contact)
+        self.assertIn("recruitment", msg.lower())
+
+    def test_founder_template_used(self):
+        contact = {"name": "Elon", "headline": "CEO & Founder", "archetype": "founder"}
+        msg = build_message("Elon", contact)
+        self.assertIn("venture", msg.lower())
+
+    def test_peer_template_used(self):
+        contact = {"name": "Jony", "headline": "Design Lead", "archetype": "peer"}
+        msg = build_message("Jony", contact)
+        self.assertIn("fellow designer", msg.lower())
+
+
+class TestConfigAndEnv(unittest.TestCase):
+    def test_get_bool_truthy_and_falsy(self):
+        from outreach.config import get_bool
+        with patch.dict(os.environ, {"FLAG_ON": "1", "FLAG_TRUE": "True", "FLAG_OFF": "0", "FLAG_FALSE": "false"}):
+            self.assertTrue(get_bool("FLAG_ON", False))
+            self.assertTrue(get_bool("FLAG_TRUE", False))
+            self.assertFalse(get_bool("FLAG_OFF", True))
+            self.assertFalse(get_bool("FLAG_FALSE", True))
+            self.assertTrue(get_bool("FLAG_MISSING", True))
+
+    def test_load_env_loads_key_values(self):
+        from outreach.config import load_env
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".env") as tmp:
+            tmp.write("# Comment\nTEST_ENV_VAR_XYZ=hello_world\nEMPTY_VAL=\n")
+            tmp_path = tmp.name
+        try:
+            with patch.dict(os.environ, {}, clear=False):
+                if "TEST_ENV_VAR_XYZ" in os.environ:
+                    del os.environ["TEST_ENV_VAR_XYZ"]
+                load_env(tmp_path)
+                self.assertEqual(os.environ.get("TEST_ENV_VAR_XYZ"), "hello_world")
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+
 if __name__ == "__main__":
     unittest.main()
+

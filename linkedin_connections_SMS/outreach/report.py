@@ -3,8 +3,9 @@ import os
 import subprocess
 from datetime import date
 
-from outreach.config import (DATA_DIR, get_int)
+from outreach.config import (DATA_DIR, DEFAULT_SEMIF_ENABLED, get_int)
 from outreach.dispatch import load_pending
+from outreach.evaluator import check_semif_connection
 from outreach.ledger import count_sent_today, count_skipped, parse_ledger, sent_keys
 from outreach.progress import refresh_progress
 
@@ -45,8 +46,11 @@ def run_stats():
     print(f"Date               : {today}")
     print(f"Total Logged       : {len(entries)} entries ({len(sent_names)} unique messaged)")
     print(f"Total Failed       : {total_failed} (retryable) | Unknown: {total_unknown} | Skipped: {total_skipped} (thread already had messages)")
+    semif_enabled = get_int("SEMIF_ENABLED", DEFAULT_SEMIF_ENABLED) != 0
+    semif_status = "active (LM Studio / qwen3.5-4b)" if semif_enabled else "disabled"
     print(f"Sent Today         : {sent_today} / {daily_limit} (Daily Limit)")
     print(f"Remaining Budget   : {remaining_today}")
+    print(f"SemIf Engine       : {semif_status}")
     print("--------------------------------------------------")
     print(f"Contacts in File   : {contacts_total}")
     print(f"Pending Unsent     : {len(pending) if pending is not None else 0}")
@@ -84,7 +88,7 @@ def _check_browser_use():
 
 
 def run_preflight():
-    """CLI: check browser/CDP, quota, and required files before a session."""
+    """CLI: check browser/CDP, quota, SemIf backend, and required files before a session."""
     daily_limit = get_int("DAILY_LIMIT", 15)
 
     print("==================================================")
@@ -92,6 +96,16 @@ def run_preflight():
     print("==================================================")
 
     cdp_ok = _check_browser_use()
+
+    semif_enabled = get_int("SEMIF_ENABLED", DEFAULT_SEMIF_ENABLED) != 0
+    if semif_enabled:
+        semif_ok, semif_msg = check_semif_connection()
+        if semif_ok:
+            print(f"[PASS] SemIf Decision Engine: {semif_msg}")
+        else:
+            print(f"[WARN] SemIf Decision Engine: {semif_msg} (will use heuristic fallback)")
+    else:
+        print("[INFO] SemIf Decision Engine: disabled (SEMIF_ENABLED=0)")
 
     sent_today = count_sent_today(parse_ledger())
     remaining = max(0, daily_limit - sent_today)
@@ -115,17 +129,31 @@ def run_preflight():
 
 
 def run_message_preview():
-    """CLI: show the rendered message (sample contact) and where to edit it."""
-    from outreach.messaging import build_message, message_template_source
-    template, origin = message_template_source()
-    sample = {"name": "Sanzida Akter", "headline": "UI/UX Designer at Acme"}
+    """CLI: show the rendered message for all archetypes and where to edit it."""
+    from outreach.messaging import build_message, get_template_for_archetype
+    from outreach.evaluator import evaluate_contact
+
+    archetypes = [
+        ("Recruiter / Talent Partner", {"name": "Sarah Jenkins", "headline": "Senior Technical Recruiter at Acme"}),
+        ("Founder / Executive", {"name": "Alex Rivera", "headline": "Founder & CEO at ScaleUI"}),
+        ("Peer Designer", {"name": "David Chen", "headline": "Lead Product Designer at TechCorp"}),
+        ("General / Default", {"name": "Sanzida Akter", "headline": "Frontend Developer"}),
+    ]
+
     print("==================================================")
-    print("        CURRENT OUTREACH MESSAGE (PREVIEW)        ")
+    print("        CURRENT OUTREACH MESSAGES (PREVIEW)       ")
     print("==================================================")
-    print(f"Template source    : {origin}")
-    print(f"Placeholders       : {{name}} {{portfolio}} {{headline}}")
-    print("--------------------------------------------------")
-    print(build_message(sample["name"], sample))
-    print("--------------------------------------------------")
+    print("Placeholders: {name} {portfolio} {headline} {archetype}\n")
+
+    for title, sample in archetypes:
+        eval_res = evaluate_contact(sample)
+        sample["archetype"] = eval_res.get("archetype", "general")
+        _, origin = get_template_for_archetype(sample["archetype"])
+        print(f"--- Persona: {title} [{sample['archetype']}] ---")
+        print(f"Template Source : {origin}")
+        print("Message Preview :")
+        print(build_message(sample["name"], sample))
+        print("-" * 50)
+
     print("Edit the wording in data/message.py - never in the engine code.")
     print("==================================================")

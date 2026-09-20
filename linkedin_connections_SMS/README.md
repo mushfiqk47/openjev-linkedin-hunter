@@ -101,6 +101,7 @@ Linkdin sms agent/
 ├── agent.py                     ← THE entry point: python agent.py <command>
 ├── outreach/                    ← the engine (importable package)
 │   ├── config.py                ← every path + setting (single source of truth)
+│   ├── evaluator.py             ← SemIf contact relevance & archetype classifier
 │   ├── browser.py               ← browser-use execution seam (timeout-protected)
 │   ├── names.py                 ← name/URL normalization + dedup keys
 │   ├── ledger.py                ← Complete.md: parse, query, append
@@ -117,7 +118,7 @@ Linkdin sms agent/
 │   ├── progress.txt             ← funnel snapshot (generated)
 │   └── total_connections.txt    ← LinkedIn connection total (generated)
 ├── tests/
-│   └── test_outreach.py         ← 38-test suite (runs without a browser)
+│   └── test_outreach.py         ← 55-test suite (runs without a browser)
 ├── docs/
 │   ├── linkedin_outreach_guide.md   ← step-by-step guide (manual + automated)
 │   └── CONTINUE.md                  ← session handoff notes

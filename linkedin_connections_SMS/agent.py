@@ -1,132 +1,132 @@
 #!/usr/bin/env python3
-"""LinkedIn Outreach Agent — the single entry point.
+"""Autonomous LinkedIn Network Outreach Agent — Unified Jev Decision Pipeline.
+
+Runs the complete outreach workflow autonomously in one command:
+  1. Preflight sanity check (Chrome CDP + SemIf Decision Engine)
+  2. Connection quota & ledger audit (respects DAILY_LIMIT)
+  3. Connection harvest & deduplication (if unsent contacts < target)
+  4. SemIf archetype classification (recruiter/founder/peer/general) & relevance scoring
+  5. Live thread pre-check duplicate guard & message dispatch
+  6. 3-point delivery verification, Complete.md logging, and funnel report update
 
 Usage:
-    python agent.py next              # harvest a batch + send + status (the one-shot)
-    python agent.py harvest           # fill data/contacts.json with unsent contacts
-    python agent.py send              # message all pending contacts (safe defaults)
-    python agent.py status            # quota + funnel report (refreshes progress.txt)
-    python agent.py progress          # fetch total connections from LinkedIn
-    python agent.py preflight         # Chrome/CDP + quota + files diagnostics
-    python agent.py message           # preview the outreach message + where to edit it
-    python agent.py selftest          # run the test suite (no browser needed)
-
-Run `python agent.py <command> --help` for command-specific options.
+    python agent.py                  # Run autonomous outreach (safe defaults)
+    python agent.py --dry-run        # Simulate outreach without sending DMs or modifying ledger
+    python agent.py --limit 10       # Override daily send limit
+    python agent.py --top 50         # Harvest larger batch
+    python agent.py --pause 20       # Review window before dispatching
 """
 import argparse
 import os
 import sys
-import unittest
 
-sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from outreach.config import load_env  # noqa: E402
-
-
-def cmd_next(args):
-    """One-shot: harvest a batch, send to it, then report status."""
-    from outreach import harvest as harvest_mod
-    from outreach.report import run_stats
-    harvest_mod.run(top=args.top)
-    if args.pause:
-        import time
-        print(f"\n[--pause] waiting {args.pause}s before sending (Ctrl+C to abort)...")
-        time.sleep(args.pause)
-    from outreach.dispatch import run as run_dispatch
-    run_dispatch(limit=args.limit)
-    run_stats()
-
-
-def cmd_harvest(args):
-    from outreach.harvest import run
-    run(top=args.top, search_only=args.search_only,
-        start_page=args.start_page, max_pages=args.max_pages)
-
-
-def cmd_send(args):
-    from outreach.dispatch import run
-    run(limit=args.limit, start_idx=args.start_idx)
-
-
-def cmd_status(_args):
-    from outreach.report import run_stats
-    run_stats()
-
-
-def cmd_progress(args):
-    from outreach.progress import run
-    run(timeout=args.timeout)
-
-
-def cmd_preflight(_args):
-    from outreach.report import run_preflight
-    run_preflight()
-
-
-def cmd_message(_args):
-    from outreach.report import run_message_preview
-    run_message_preview()
-
-
-def cmd_selftest(_args):
-    tests = unittest.defaultTestLoader.discover("tests", pattern="test_*.py")
-    runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(tests)
-    sys.exit(0 if result.wasSuccessful() else 1)
+from outreach.config import get_bool, get_int, get_str, load_env
+from outreach.core import OutreachHooks, OutreachParams, run_outreach
 
 
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="agent.py",
-        description="LinkedIn Outreach Agent - harvest connections, send personalized DMs, track progress.")
-    sub = parser.add_subparsers(dest="command", required=True)
-
-    p = sub.add_parser("next", help="harvest a batch + send + status (the one-shot flow)")
-    p.add_argument("--top", type=int, default=None, help="how many contacts to harvest (default TOP_N=25)")
-    p.add_argument("--limit", type=int, default=None, help="override DAILY_LIMIT for this run")
-    p.add_argument("--pause", type=int, default=None, metavar="SEC",
-                   help="pause SEC seconds between harvest and send (review window)")
-    p.set_defaults(func=cmd_next)
-
-    p = sub.add_parser("harvest", help="fill data/contacts.json with unsent contacts")
-    p.add_argument("--top", type=int, default=None, help="target count (default TOP_N=25)")
-    p.add_argument("--search-only", action="store_true",
-                   help="skip the connections page; sweep People Search directly")
-    p.add_argument("--start-page", type=int, default=None, help="first search page (default 1)")
-    p.add_argument("--max-pages", type=int, default=None,
-                   help="search page bound (default SEARCH_MAX_PAGES=50, or MAX_PAGES=10 with --search-only)")
-    p.set_defaults(func=cmd_harvest)
-
-    p = sub.add_parser("send", help="message all pending contacts (respects DAILY_LIMIT + pacing)")
-    p.add_argument("--limit", type=int, default=None, help="override DAILY_LIMIT for this run")
-    p.add_argument("--start-idx", type=int, default=None, help="resume offset into the pending list")
-    p.set_defaults(func=cmd_send)
-
-    p = sub.add_parser("status", help="quota + funnel report (refreshes data/progress.txt)")
-    p.set_defaults(func=cmd_status)
-
-    p = sub.add_parser("progress", help="fetch the total connection count from LinkedIn")
-    p.add_argument("--timeout", type=int, default=None, metavar="SEC",
-                   help="browser-use timeout for this fetch (default BU_TIMEOUT=180)")
-    p.set_defaults(func=cmd_progress)
-
-    p = sub.add_parser("preflight", help="Chrome/CDP + quota + files diagnostics")
-    p.set_defaults(func=cmd_preflight)
-
-    p = sub.add_parser("message", help="preview the outreach message + where to edit it")
-    p.set_defaults(func=cmd_message)
-
-    p = sub.add_parser("selftest", help="run the test suite (no browser needed)")
-    p.set_defaults(func=cmd_selftest)
-
+        description="🎯 Autonomous LinkedIn Network Outreach Agent — SemIf Persona & Decision Engine",
+    )
+    parser.add_argument(
+        "--limit",
+        "-l",
+        type=int,
+        default=None,
+        help="Override DAILY_LIMIT for this run (default: from .env or 15)",
+    )
+    parser.add_argument(
+        "--top",
+        "-t",
+        "-n",
+        type=int,
+        default=None,
+        help="Target number of unsent contacts to ensure in pool (default: TOP_N from .env or 25)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Simulate the outreach run without typing/sending DMs or writing to the ledger",
+    )
+    parser.add_argument(
+        "--pause",
+        "-p",
+        type=int,
+        default=None,
+        metavar="SEC",
+        help="Pause SEC seconds between harvest and dispatch for review (default: from .env or 0)",
+    )
+    parser.add_argument(
+        "--search-only",
+        action="store_true",
+        help="Skip the connections page; sweep 1st-degree People Search directly",
+    )
+    parser.add_argument(
+        "--start-page",
+        type=int,
+        default=None,
+        help="First search page (default: from .env or 1)",
+    )
+    parser.add_argument(
+        "--max-pages",
+        type=int,
+        default=None,
+        help="Maximum search pages to sweep (default: from .env or 50)",
+    )
     return parser
 
 
 def main(argv=None):
     load_env()
     args = build_parser().parse_args(argv)
-    return args.func(args)
+
+    # Resolve settings: CLI flags take highest priority, followed by .env file, then safe defaults
+    daily_limit = args.limit if args.limit is not None else get_int("DAILY_LIMIT", 15)
+    top_n = args.top if args.top is not None else get_int("TOP_N", 25)
+    pause_sec = args.pause if args.pause is not None else (get_int("PAUSE", 0) or None)
+    dry_run = args.dry_run or get_bool("DRY_RUN", False)
+    search_only = args.search_only or get_bool("SEARCH_ONLY", False)
+    start_page = args.start_page if args.start_page is not None else get_int("START_PAGE", 1)
+    max_pages = args.max_pages if args.max_pages is not None else get_int("MAX_PAGES", get_int("SEARCH_MAX_PAGES", 50))
+
+    limit_src = "CLI override" if args.limit is not None else ("from .env" if "DAILY_LIMIT" in os.environ else "default (15)")
+    top_src = "CLI override" if args.top is not None else ("from .env" if "TOP_N" in os.environ else "default (25)")
+    mode_src = "CLI flag" if args.dry_run else ("from .env" if "DRY_RUN" in os.environ else "live")
+
+    print("=" * 68)
+    print("🚀 Starting Autonomous LinkedIn Network Outreach Agent (Jev System)")
+    print(f"   Target Batch:       {top_n} ({top_src})")
+    print(f"   Daily Send Limit:   {daily_limit} ({limit_src})")
+    print(f"   Mode:               {'DRY-RUN SIMULATION' if dry_run else 'LIVE DISPATCH'} ({mode_src})")
+    if search_only:
+        search_src = "CLI flag" if args.search_only else "from .env"
+        print(f"   Search Sweep:       1st-degree People Search pages {start_page}..{max_pages} ({search_src})")
+    if pause_sec:
+        pause_src = "CLI flag" if args.pause is not None else "from .env"
+        print(f"   Review Pause:       {pause_sec}s review window ({pause_src})")
+    print("=" * 68)
+
+    params = OutreachParams(
+        top=top_n,
+        limit=daily_limit,
+        pause=pause_sec,
+        dry_run=dry_run,
+        search_only=search_only,
+        start_page=start_page,
+        max_pages=max_pages,
+    )
+
+    def _log(msg: str, level: str = "info"):
+        tag = {"match": "[★]", "success": "[✓]", "warning": "[!]", "error": "[✗]"}.get(level, "[i]")
+        print(f"  {tag} {msg}")
+
+    hooks = OutreachHooks(on_event=_log)
+    result = run_outreach(params, hooks)
+    return 0
 
 
 if __name__ == "__main__":

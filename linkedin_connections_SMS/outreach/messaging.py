@@ -5,9 +5,11 @@ The greeting uses the full cleaned name — nothing else.
 The template file is data the user owns — never edit engine code to change
 the wording.
 """
+import importlib.util
+import os
 import sys
 
-from outreach.config import DATA_DIR, DEFAULT_PORTFOLIO_URL, get_str
+from outreach.config import DEFAULT_PORTFOLIO_URL, MESSAGE_FILE, get_str
 from outreach.names import clean_display_name
 
 DEFAULT_MESSAGE = (
@@ -19,48 +21,67 @@ DEFAULT_MESSAGE = (
 )
 
 _message_template_cache = []
+_templates_module_cache = []
 
 
-def _load_message_template():
-    """Load MESSAGE from the user-editable data/message.py."""
-    if _message_template_cache:
-        return _message_template_cache[0]
-    template = None
+def _get_message_module():
+    """Load the user-editable data/message.py module dynamically."""
+    if _templates_module_cache:
+        return _templates_module_cache[0]
+    mod = None
     try:
-        if DATA_DIR not in sys.path:
-            sys.path.insert(0, DATA_DIR)
-        import message as message_config
-        template = getattr(message_config, "MESSAGE", None)
-    except ImportError:
-        template = None
+        if os.path.isfile(MESSAGE_FILE):
+            spec = importlib.util.spec_from_file_location("data_message_module", MESSAGE_FILE)
+            if spec and spec.loader:
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
     except Exception as e:
         print(f"[WARN] data/message.py could not be loaded ({e}); using built-in default template.")
-        template = None
-    _message_template_cache.append(template)
-    return template
+        mod = None
+    _templates_module_cache.append(mod)
+    return mod
 
 
-def message_template_source():
+def get_template_for_archetype(archetype=None):
+    """Retrieve the template corresponding to archetype (recruiter, founder, peer, general)."""
+    if _message_template_cache:
+        return _message_template_cache[0], "custom override"
+    mod = _get_message_module()
+    if mod is not None:
+        if archetype == "recruiter" and hasattr(mod, "MESSAGE_RECRUITER"):
+            return getattr(mod, "MESSAGE_RECRUITER"), "data/message.py (recruiter)"
+        elif archetype == "founder" and hasattr(mod, "MESSAGE_FOUNDER"):
+            return getattr(mod, "MESSAGE_FOUNDER"), "data/message.py (founder)"
+        elif archetype == "peer" and hasattr(mod, "MESSAGE_PEER"):
+            return getattr(mod, "MESSAGE_PEER"), "data/message.py (peer)"
+        elif hasattr(mod, "MESSAGE") and mod.MESSAGE:
+            return getattr(mod, "MESSAGE"), "data/message.py (general)"
+    return DEFAULT_MESSAGE, "built-in default"
+
+
+def message_template_source(archetype=None):
     """(template, origin) — origin is 'data/message.py' or 'built-in default'."""
-    template = _load_message_template()
-    return (template, "data/message.py") if template else (DEFAULT_MESSAGE, "built-in default")
+    return get_template_for_archetype(archetype)
 
 
 def build_message(name, contact=None):
     """Render the outreach message. `contact` (optional dict) enables the
-    {headline} placeholder."""
+    {headline}, {archetype} placeholders, and chooses the optimal template."""
     portfolio = get_str("PORTFOLIO_URL", DEFAULT_PORTFOLIO_URL)
     headline = ""
+    archetype = "general"
     if isinstance(contact, dict):
         headline = clean_display_name(contact.get("headline", "") or "")
+        archetype = contact.get("archetype", "general") or "general"
     fields = {
         "name": clean_display_name(name),
         "portfolio": portfolio,
         "headline": headline,
+        "archetype": archetype,
     }
-    template = _load_message_template() or DEFAULT_MESSAGE
+    template, _ = get_template_for_archetype(archetype)
     try:
         return template.format(**fields)
     except Exception as e:
-        print(f"[WARN] data/message.py template has a bad placeholder ({e}); using built-in default.")
+        print(f"[WARN] data/message.py template for {archetype} had a bad placeholder ({e}); using built-in default.")
         return DEFAULT_MESSAGE.format(**fields)

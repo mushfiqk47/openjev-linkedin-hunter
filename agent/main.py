@@ -18,6 +18,7 @@ def show_banner():
   4. 🔑 Login to LinkedIn (Save Browser Session)
   5. 🌐 Launch Live Web Dashboard (http://127.0.0.1:8085)
   6. 🧠 Triage Matched Jobs (next actions + recruiter openers)
+  7. 💬 Run LinkedIn Network Outreach (Autonomous SemIf DM Agent)
   0. 🚪 Exit
 ===============================================================
 """)
@@ -67,11 +68,31 @@ def handle_view_report():
     print("-" * 60 + "\n")
 
 
+def handle_outreach():
+    from pathlib import Path
+    import subprocess
+    sms_dir = Path(__file__).resolve().parent.parent / "linkedin_connections_SMS"
+    agent_py = sms_dir / "agent.py"
+    
+    print("\n--- 💬 LinkedIn Network Outreach Agent ---")
+    mode = input("Run mode: [1] Live Send  [2] Dry-Run Simulation (safe preview) [default: 2]: ").strip() or "2"
+    dry_run = mode != "1"
+    limit = input("Daily send limit override (Press Enter for default): ").strip()
+    
+    cmd = [sys.executable, str(agent_py)]
+    if dry_run:
+        cmd.append("--dry-run")
+    if limit:
+        cmd.extend(["--limit", limit])
+        
+    subprocess.run(cmd, cwd=str(sms_dir))
+
+
 def main():
     while True:
         try:
             show_banner()
-            choice = input("Select an option (0-6): ").strip()
+            choice = input("Select an option (0-7): ").strip()
 
             if choice == "1":
                 q = input("Job Title [default: 'UI/UX Designer']: ").strip() or "UI/UX Designer"
@@ -90,11 +111,13 @@ def main():
                 run_web()
             elif choice == "6":
                 handle_triage()
+            elif choice == "7":
+                handle_outreach()
             elif choice == "0":
                 print("\nGoodbye! 👋\n")
                 break
             else:
-                print("[!] Invalid option. Please choose 0 to 6.")
+                print("[!] Invalid option. Please choose 0 to 7.")
         except (KeyboardInterrupt, EOFError):
             print("\nGoodbye! 👋\n")
             break

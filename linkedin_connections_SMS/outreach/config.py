@@ -21,6 +21,7 @@ def data_file(filename):
 
 CONTACTS_FILE = data_file("contacts.json")
 LEDGER_FILE = data_file("Complete.md")
+REGISTRY_FILE = data_file("connections_registry.json")
 PROGRESS_FILE = data_file("progress.txt")
 TOTAL_FILE = data_file("total_connections.txt")
 ENV_FILE = data_file(".env")
@@ -32,24 +33,63 @@ BU_TIMEOUT = int(os.environ.get("BU_TIMEOUT", "180"))
 DEFAULT_PORTFOLIO_URL = "https://mushfiqkabiruix.vercel.app/"
 DEFAULT_CONNECTIONS_URL = "https://www.linkedin.com/mynetwork/invite-connect/connections/"
 
+# Path to the shared SemIf backend and CV profile
+BACKEND_SRC = os.path.abspath(os.path.join(ROOT_DIR, "..", "backend", "src"))
+CV_FILE = os.path.abspath(os.path.join(ROOT_DIR, "..", "Mushfiq_Kabir_CV.json"))
+
+# SemIf Decision Backend configuration defaults
+DEFAULT_SEMIF_ENABLED = 1
+DEFAULT_SEMIF_BASE_URL = "http://localhost:1234/v1"
+DEFAULT_SEMIF_MODEL = "qwen3.5-4b"
+DEFAULT_MIN_RELEVANCE_SCORE = 50
+DEFAULT_FILTER_LOW_RELEVANCE = 1
+
 
 def load_env(env_path=None):
-    """Load data/.env (KEY=value per line, '#' comments, no quotes).
-    Values already in the environment win — session overrides file."""
-    if env_path is None:
-        env_path = ENV_FILE
-    if not os.path.isfile(env_path):
-        return
-    if os.path.commonpath([os.path.abspath(DATA_DIR), os.path.abspath(env_path)]) != os.path.abspath(DATA_DIR):
-        print(f"[WARN] refusing to load .env outside the data directory: {env_path}")
-        return
-    with open(env_path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.partition("=")
-            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+    """Load configuration from .env file (KEY=value per line, '#' comments, no quotes).
+    Searches:
+      1. Explicit env_path (if provided)
+      2. Package root: linkedin_connections_SMS/.env
+      3. Data directory: linkedin_connections_SMS/data/.env
+    Values already present in the OS environment take precedence (12-factor standard).
+    """
+    targets = []
+    if env_path is not None:
+        targets.append(os.path.abspath(env_path))
+    else:
+        root_env = os.path.abspath(os.path.join(ROOT_DIR, ".env"))
+        data_env = os.path.abspath(os.path.join(DATA_DIR, ".env"))
+        if os.path.isfile(root_env):
+            targets.append(root_env)
+        if os.path.isfile(data_env) and data_env != root_env:
+            targets.append(data_env)
+
+    for path in targets:
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, _, value = line.partition("=")
+                    os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        except Exception as e:
+            print(f"[WARN] Failed reading .env file at {path}: {e}")
+
+
+def get_bool(name, default=False):
+    """Parse a boolean environment variable (1/true/yes/on vs 0/false/no/off)."""
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    val = str(val).strip().lower()
+    if val in ("1", "true", "yes", "on"):
+        return True
+    if val in ("0", "false", "no", "off"):
+        return False
+    return default
 
 
 def get_int(name, default):
@@ -68,3 +108,4 @@ def get_float(name, default):
 
 def get_str(name, default):
     return os.environ.get(name, default)
+

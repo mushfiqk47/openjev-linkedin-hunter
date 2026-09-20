@@ -29,13 +29,14 @@ LEDGER_RE = re.compile(
 )
 
 
-def parse_ledger():
+def parse_ledger(ledger_file=None):
     """Parse Complete.md into entry dicts: name, norm, slug, date, status, url.
     Legacy lines without a status marker count as SENT."""
+    target_file = ledger_file or LEDGER_FILE
     entries = []
-    if not os.path.exists(LEDGER_FILE):
+    if not os.path.exists(target_file):
         return entries
-    with open(LEDGER_FILE, encoding="utf-8") as f:
+    with open(target_file, encoding="utf-8") as f:
         for line in f:
             m = LEDGER_RE.match(line.strip())
             if not m:
@@ -97,8 +98,9 @@ def count_skipped(entries):
     return len([e for e in entries if e["status"] == "SKIPPED"])
 
 
-def append_ledger(name, status, url=""):
+def append_ledger(name, status, url="", ledger_file=None):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     url_part = f" - {url}" if url else ""
-    with open(LEDGER_FILE, "a", encoding="utf-8") as f:
+    target_file = ledger_file or LEDGER_FILE
+    with open(target_file, "a", encoding="utf-8") as f:
         f.write(f"- {name} ({ts}) - {status}{url_part}\n")

@@ -24,7 +24,9 @@ import time
 from datetime import date
 
 from outreach.browser import run_bu_script
-from outreach.config import (CONTACTS_FILE, get_float, get_int)
+from outreach.config import (CONTACTS_FILE, DEFAULT_FILTER_LOW_RELEVANCE,
+                             DEFAULT_MIN_RELEVANCE_SCORE, get_float, get_int)
+from outreach.evaluator import evaluate_contact
 from outreach.ledger import (append_ledger, count_sent_today, is_messaged,
                              norm_name, parse_ledger, profile_slug, sent_keys)
 from outreach.messaging import build_message
@@ -323,7 +325,7 @@ def load_pending(entries, sent_names, sent_slugs, start_idx=0):
     return pending[start_idx:]
 
 
-def run(limit=None, start_idx=None):
+def run(limit=None, start_idx=None, dry_run=False):
     """CLI: dispatch messages to pending contacts (safe by default)."""
     today = date.today().strftime("%Y-%m-%d")
     pacing = get_int("PACING", 6)
@@ -334,6 +336,8 @@ def run(limit=None, start_idx=None):
 
     thread_check = get_int("THREAD_CHECK", 1) != 0
     thread_check_strict = get_int("THREAD_CHECK_STRICT", 0) != 0
+    filter_low_relevance = get_int("FILTER_LOW_RELEVANCE", DEFAULT_FILTER_LOW_RELEVANCE) != 0
+    min_relevance = get_int("MIN_RELEVANCE_SCORE", DEFAULT_MIN_RELEVANCE_SCORE)
 
     entries = parse_ledger()
     sent_names, sent_slugs = sent_keys(entries)
@@ -341,33 +345,34 @@ def run(limit=None, start_idx=None):
     remaining_budget = daily_limit - sent_today
 
     if not os.path.exists(CONTACTS_FILE):
-        print(f"NO_CONTACTS_FILE: {CONTACTS_FILE} is missing - run `python agent.py harvest` first.")
+        print(f"NO_CONTACTS_FILE: {CONTACTS_FILE} is missing - harvesting needed first.")
         refresh_progress()
-        return
+        return []
     pending = load_pending(entries, sent_names, sent_slugs, start_idx)
     if pending is None:
-        print(f"CONTACTS_FILE_ERROR: could not read contacts.json - run `python agent.py harvest`.")
+        print(f"CONTACTS_FILE_ERROR: could not read contacts.json.")
         refresh_progress()
-        return
+        return []
 
     if remaining_budget <= 0:
         print(f"DAILY_LIMIT_REACHED: {sent_today} already SENT today ({today}); limit is {daily_limit}.")
         print("Stop for today, or raise DAILY_LIMIT in data/.env / environment if you accept the risk.")
         refresh_progress()
-        return
+        return []
     if not pending:
         print("NOTHING_TO_SEND: every contact in contacts.json is already logged in the ledger.")
-        print("Harvest the next batch with `python agent.py harvest`.")
         refresh_progress()
-        return
+        return []
     if len(pending) > remaining_budget:
         print(f"BUDGET_WARNING: {len(pending)} pending but only {remaining_budget} left today "
               f"(limit {daily_limit}). Sending the first {remaining_budget}.")
         pending = pending[:remaining_budget]
 
-    print(f"PLAN: send to {len(pending)} contacts (already messaged: {len(sent_names)}, "
+    mode_str = " [DRY-RUN SIMULATION]" if dry_run else ""
+    print(f"PLAN{mode_str}: send to {len(pending)} contacts (already messaged: {len(sent_names)}, "
           f"sent today: {sent_today}, budget left: {remaining_budget}, pacing: {pacing}-{round(pacing * pacing_jitter)}s jittered, "
-          f"thread check: {'on' if thread_check else 'off'}{' (strict)' if thread_check and thread_check_strict else ''})")
+          f"thread check: {'on' if thread_check else 'off'}{' (strict)' if thread_check and thread_check_strict else ''}, "
+          f"semif filter: {'on (>=' + str(min_relevance) + '%)' if filter_low_relevance else 'off'})")
 
     results = []
     for i, c in enumerate(pending):
@@ -375,11 +380,30 @@ def run(limit=None, start_idx=None):
         url = c.get("profile_url") or c.get("compose_url") or ""
         print(f"\n===== CONTACT {i + 1}/{len(pending)}: {name} =====")
 
+        # SemIf: evaluate contact relevance & classify archetype
+        eval_res = evaluate_contact(c)
+        c["archetype"] = eval_res.get("archetype", "general")
+        c["relevance"] = eval_res.get("relevance", 60)
+        c["eval_reason"] = eval_res.get("reason", "")
+        print(f"    [SemIf] Archetype: {c['archetype']} | Relevance: {c['relevance']}% ({eval_res.get('backend')})")
+        if c["eval_reason"]:
+            print(f"    [SemIf Detail] {c['eval_reason']}")
+
+        # Low-relevance filter: skip and log to avoid wasting daily send quota
+        if filter_low_relevance and c["relevance"] < min_relevance:
+            status = "SKIPPED"
+            detail = f"low relevance score ({c['relevance']}% < {min_relevance}%, {c['archetype']})"
+            print(f"    [skip] {detail}")
+            if not dry_run:
+                append_ledger(name, status, url=url)
+            results.append({"name": name, "status": status, "detail": detail})
+            continue
+
         # Live duplicate guard: skip anyone whose LinkedIn conversation already
         # has messages, before spending typing/send actions on them.
         skipped = False
         status, detail = "FAILED", "not attempted"
-        if thread_check:
+        if thread_check and not dry_run:
             has_messages, check_detail = check_existing_thread(c)
             skipped, reason = thread_decision(has_messages, check_detail, strict=thread_check_strict)
             if skipped:
@@ -388,14 +412,23 @@ def run(limit=None, start_idx=None):
             elif has_messages is None:
                 print(f"    [warn] thread check inconclusive ({check_detail}); sending (ledger still dedups)")
         if not skipped:
-            try:
-                status, detail = send_with_retries(c, max_attempts)
-            except Exception as e:
-                status, detail = "FAILED", f"unexpected error: {e}"
-        append_ledger(name, status, url=url)
+            if dry_run:
+                status = "SIMULATED"
+                preview = build_message(name, c).replace('\n', ' ')[:90]
+                detail = f"dry-run: would send [{c['archetype']}]: {preview}..."
+                print(f"    [DRY-RUN] {detail}")
+            else:
+                try:
+                    status, detail = send_with_retries(c, max_attempts)
+                except Exception as e:
+                    status, detail = "FAILED", f"unexpected error: {e}"
+        if not dry_run:
+            append_ledger(name, status, url=url)
+            print(f"--> Status: {status} ({detail}) | logged to Complete.md")
+        else:
+            print(f"--> Status: {status} ({detail}) [simulated - ledger unchanged]")
         results.append({"name": name, "status": status, "detail": detail})
-        print(f"--> Status: {status} ({detail}) | logged to Complete.md")
-        if i < len(pending) - 1:
+        if not dry_run and i < len(pending) - 1:
             delay = random.uniform(pacing, pacing * max(1.0, pacing_jitter))
             print(f"----- pacing {round(delay)}s before next contact -----")
             time.sleep(delay)

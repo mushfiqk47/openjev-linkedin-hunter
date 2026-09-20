@@ -15,6 +15,7 @@ from pathlib import Path
 
 from outreach.browser import run_bu_script
 from outreach.config import (CONTACTS_FILE, DEFAULT_CONNECTIONS_URL, get_int, get_str)
+from outreach.evaluator import evaluate_contact
 from outreach.ledger import is_messaged, parse_ledger, sent_keys
 from outreach.names import clean_display_name, norm_name
 
@@ -185,6 +186,10 @@ def try_add(existing_map, entries, sent_names, sent_slugs, raw_name, profile_url
         "profile_url": profile_url,
         "headline": clean_display_name(headline or ""),
     }
+    # SemIf contact evaluation (archetype & relevance scoring)
+    eval_res = evaluate_contact({"name": display_name, "headline": headline})
+    entry["archetype"] = eval_res.get("archetype", "general")
+    entry["relevance"] = eval_res.get("relevance", 60)
     existing_map[n_name] = entry
     return True
 
@@ -246,7 +251,10 @@ def harvest_search_pages(existing_map, entries, sent_names, sent_slugs, target, 
 
 
 def save_contacts(existing_map, target):
-    contacts = list(existing_map.values())[:target]
+    contacts = list(existing_map.values())
+    # Sort by relevance score descending so the most valuable connections are prioritized
+    contacts.sort(key=lambda c: c.get("relevance", 60), reverse=True)
+    contacts = contacts[:target]
     Path(CONTACTS_FILE).write_text(
         json.dumps(contacts, indent=2, ensure_ascii=False), encoding="utf-8")
     return contacts

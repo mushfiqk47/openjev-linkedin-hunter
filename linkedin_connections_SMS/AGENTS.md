@@ -51,9 +51,9 @@ Everything goes through `python agent.py <command>` — never call module intern
 | Path | What it is |
 |---|---|
 | `agent.py` | THE entry point (argparse CLI) |
-| `outreach/` | Engine package: `config` (all paths/settings), `browser` (browser-use seam), `names`, `ledger`, `messaging`, `progress`, `harvest`, `dispatch`, `report` |
+| `outreach/` | Engine package: `config` (all paths/settings), `evaluator` (SemIf relevance & archetype classifier), `browser` (browser-use seam), `names`, `ledger`, `messaging`, `progress`, `harvest`, `dispatch`, `report` |
 | `data/` | **Everything the user owns**: `.env` (config), `message.py` (the message wording), `Complete.md` (ledger, tracked), `contacts.json`, `progress.txt`, `total_connections.txt` (generated) |
-| `tests/` | 38-test unittest suite — run `python agent.py selftest` |
+| `tests/` | 55-test unittest suite — run `python agent.py selftest` |
 | `docs/` | `linkedin_outreach_guide.md`, `CONTINUE.md` |
 | `.agents/skills/linkedin-outreach-agent/` | Skill runbook + references (same CLI) |
 
@@ -85,3 +85,4 @@ Edit **`data/message.py`**. Placeholders: `{name}` (full clean name — nothing 
 - **Thread pre-check in the wild (Verified 2026-09-21)**: a 15-contact batch logged 13 `SENT` and 2 `SKIPPED` (threads already had 1 and 12 messages) — the live duplicate guard works against the real DOM.
 - **Pacing & quota**: delay randomized `PACING..PACING×PACING_JITTER`; daily limit counts SENT + UNKNOWN; hung browser calls die at `BU_TIMEOUT`.
 - **Name normalization** (dedup only): NFKC + invisible RTL marks (`\u200e`/`\u200f`) + degree badges (`• 1st`) stripped. The greeting uses the full name — no first-name or title handling. All in `outreach/names.py`.
+- **SemIf Decision Backend Integration (Verified 2026-09-21)**: The outreach engine now connects to `backend/src/semif_phase1` to evaluate contact relevance and classify persona archetypes (`recruiter`, `founder`, `peer`, `general`) in a sub-300ms forward pass using LM Studio (`qwen3.5-4b`). BM25 headline prescreening drops disqualified careers (<1ms). Low relevance contacts (<50%) are skipped before dispatch to conserve the daily 15-send cap. Persona-specific templates (`MESSAGE_RECRUITER`, `MESSAGE_FOUNDER`, `MESSAGE_PEER`) are dynamically selected from `data/message.py`. If LM Studio is offline, the engine seamlessly falls back to deterministic keyword heuristics.
