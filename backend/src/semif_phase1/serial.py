@@ -1,5 +1,3 @@
-"""Serialized decisions over one-state native prefix caches."""
-
 from __future__ import annotations
 
 import copy
@@ -10,7 +8,6 @@ import time
 
 from .core import direct_messages, softmax
 from .direct import PROMPT_VERSION, encode_prompt
-
 
 def _state_prefix(tokenizer, state) -> list[int]:
     row = {
@@ -30,7 +27,6 @@ def _state_prefix(tokenizer, state) -> list[int]:
     text = prompt[: prompt.index(payload)] + evidence
     return tokenizer.encode(text, add_special_tokens=False)[:-1]
 
-
 def _cached_forward(model, inputs):
     parameters = inspect.signature(model.forward).parameters
     if "logits_to_keep" not in parameters and hasattr(model, "get_base_model"):
@@ -39,9 +35,7 @@ def _cached_forward(model, inputs):
         raise RuntimeError("Model lacks selective last-position logits")
     return model(**inputs, use_cache=True, return_dict=True, logits_to_keep=1)
 
-
 class SerialPrefixScorer:
-    """Cache the current state, then score independent copied suffix branches."""
 
     def __init__(self, model, tokenizer, metadata: dict, max_tokens: int = 4096):
         self.model = model

@@ -1,12 +1,9 @@
-"""Download redistributable source snapshots used by the evaluation manifests."""
-
 from __future__ import annotations
 
 import argparse
 import hashlib
 from pathlib import Path
 import urllib.request
-
 
 SOURCES = {
     "wanli-test.jsonl": (
@@ -23,7 +20,6 @@ SOURCES = {
         "9fbf42e9d9e7cd3b072e0271a0959dbfdca85618e93fe4f0ca519d683c418bf0",
     ),
 }
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -44,7 +40,6 @@ def main() -> None:
             raise ValueError(f"{url} changed: expected {expected}, received {actual}")
         destination.write_bytes(data)
         print(f"{actual}  {destination}")
-
 
 if __name__ == "__main__":
     main()

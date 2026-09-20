@@ -1,5 +1,3 @@
-"""Parallel decisions over one exact shared state using a native prefix cache."""
-
 from __future__ import annotations
 
 import inspect
@@ -9,12 +7,11 @@ import time
 from .core import direct_messages, softmax
 from .direct import PROMPT_VERSION, encode_prompt
 
-
 def _state_prefix(tokenizer, state) -> list[int]:
     row = {
         "id": "prefix-only",
         "state": state,
-        # This value occurs after the extracted evidence boundary.
+
         "question": "prefix boundary placeholder",
         "options": [
             {"id": "yes", "description": "Yes"},
@@ -32,9 +29,8 @@ def _state_prefix(tokenizer, state) -> list[int]:
     if not payload.startswith(evidence):
         raise ValueError("Evidence serialization changed")
     text = prompt[: prompt.index(payload)] + evidence
-    # Appending JSON punctuation can merge with the final boundary token.
-    return tokenizer.encode(text, add_special_tokens=False)[:-1]
 
+    return tokenizer.encode(text, add_special_tokens=False)[:-1]
 
 def _suffix_layout(sequences: list[list[int]], prefix_length: int, pad_id: int):
     if not sequences or any(not sequence for sequence in sequences):
@@ -49,9 +45,8 @@ def _suffix_layout(sequences: list[list[int]], prefix_length: int, pad_id: int):
         ends.append(len(sequence) - 1)
     return {"input_ids": ids, "attention_mask": masks, "position_ids": positions}, ends
 
-
 def score_shared(model, tokenizer, rows: list[dict], metadata: dict, max_tokens: int = 4096):
-    """Return all option distributions together after one state prefill."""
+
     import torch
 
     if not rows or any(row["state"] != rows[0]["state"] for row in rows[1:]):

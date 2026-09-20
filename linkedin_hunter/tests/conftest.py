@@ -1,10 +1,3 @@
-"""Shared test fixtures for the LinkedIn hunter package.
-
-The fake client implements the same ``chat(messages)`` contract the real
-``RemoteClient`` exposes, returning OpenAI-shaped logprobs so the SemIf scoring
-engine can run end to end without LM Studio.
-"""
-
 import json
 import math
 import sys
@@ -16,14 +9,11 @@ if str(PROJECT_ROOT) not in sys.path:
 
 LETTERS = "ABCDEFGHIJKLMNOP"
 
-
 def probs(*values: float) -> list[float]:
-    """Turn probabilities into the logprob list the scorer expects."""
+
     return [math.log(v) for v in values]
 
-
 class FakeClient:
-    """Consumes queued logprob lists, or calls a responder(payload, n) hook."""
 
     def __init__(self, responses=None, responder=None):
         self.responses = list(responses or [])
@@ -54,9 +44,7 @@ class FakeClient:
             "usage": {"prompt_tokens": 8, "completion_tokens": 1},
         }
 
-
 class FakeEvaluator:
-    """Deterministic evaluator for hunt_core tests (no model)."""
 
     def __init__(self, scores: dict | None = None, default: int = 50):
         self.scores = scores or {}
@@ -79,7 +67,6 @@ class FakeEvaluator:
 
     def evaluate_feed_post(self, author, post_text, criteria=None):
         return self.evaluate(post_text or author, "", author)
-
 
 class FakeStore:
     def __init__(self):

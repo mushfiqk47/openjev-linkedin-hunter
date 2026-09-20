@@ -1,11 +1,8 @@
-"""Rebuild the frozen 256-row WANLI evaluation from pinned upstream rows."""
-
 from __future__ import annotations
 
 import argparse
 import json
 from pathlib import Path
-
 
 DESCRIPTIONS = {
     "supported": "The evidence establishes the claim",
@@ -13,7 +10,6 @@ DESCRIPTIONS = {
     "contradicted": "The evidence establishes the opposite",
 }
 LABELS = {"entailment": "supported", "neutral": "insufficient", "contradiction": "contradicted"}
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -58,7 +54,6 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows))
     print(f"wrote {len(rows)} rows")
-
 
 if __name__ == "__main__":
     main()

@@ -1,35 +1,84 @@
-"""Configuration settings for LinkedIn Job Hunter."""
-
+import os
 from pathlib import Path
 
-# Base directories
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent
 OUTPUT_DIR = BASE_DIR / "output"
 SEEN_JOBS_FILE = BASE_DIR / "seen_jobs.json"
 CV_JSON_PATH = PROJECT_ROOT / "Mushfiq_Kabir_CV.json"
+ENV_FILE = BASE_DIR / ".env"
+ROOT_ENV_FILE = PROJECT_ROOT / ".env"
 
-# Ensure output directory exists
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Search Defaults
-DEFAULT_QUERIES = [
-    "UI/UX Designer",
-    "Product Designer",
-    "Figma Designer",
-    "UI Designer",
-    "Design Systems Designer",
-]
+def load_env(env_path: Path | str | None = None):
 
-# LinkedIn URL Filters
-# f_TPR: Time Posted Range (r86400 = past 24h, r604800 = past week)
+    candidates = []
+    if env_path is not None:
+        candidates.append(Path(env_path))
+    else:
+        candidates.extend([ENV_FILE, ROOT_ENV_FILE])
+
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, _, value = line.partition("=")
+                    os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        except Exception as e:
+            print(f"[WARN] Failed reading .env at {path}: {e}")
+
+load_env()
+
+def get_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+def get_float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+def get_str(name: str, default: str) -> str:
+    return os.environ.get(name, default)
+
+def get_bool(name: str, default: bool = False) -> bool:
+    val = os.environ.get(name)
+    if val is None:
+        return default
+    val = str(val).strip().lower()
+    if val in ("1", "true", "yes", "on"):
+        return True
+    if val in ("0", "false", "no", "off"):
+        return False
+    return default
+
+_queries_env = os.environ.get("DEFAULT_QUERIES")
+if _queries_env:
+    DEFAULT_QUERIES = [q.strip() for q in _queries_env.split(",") if q.strip()]
+else:
+    DEFAULT_QUERIES = [
+        "UI/UX Designer",
+        "Product Designer",
+        "Figma Designer",
+        "UI Designer",
+        "Design Systems Designer",
+    ]
+
 RECENCY_FILTERS = {
     "24h": "r86400",
     "week": "r604800",
     "any": "",
 }
 
-# f_WT: Work Type (1 = On-site, 2 = Remote, 3 = Hybrid)
 WORK_TYPES = {
     "remote": "2",
     "on_site": "1",
@@ -37,27 +86,24 @@ WORK_TYPES = {
     "all": "",
 }
 
-# LLM Configuration (Local LM Studio)
-LLM_BASE_URL = "http://localhost:1234/v1"
-LLM_MODEL = "qwen3.5-4b"
-LLM_TIMEOUT = 45.0
+LLM_BASE_URL = get_str("LLM_BASE_URL", get_str("SEMIF_REMOTE_BASE_URL", "http://localhost:1234/v1"))
+LLM_MODEL = get_str("LLM_MODEL", get_str("SEMIF_REMOTE_MODEL", "qwen3.5-4b"))
+LLM_TIMEOUT = get_float("LLM_TIMEOUT", 45.0)
 
-# Matching Thresholds & Hunting Goals
-DEFAULT_MIN_SCORE = 70       # out of 100
-DEFAULT_MIN_MATCHES = 10     # Target minimum matched jobs to find
-DEFAULT_MAX_PAGES_PER_QUERY = 2  # Max pages to paginate per query before rotating / feed fallback
-DEFAULT_JOB_LIMIT = 50       # Safety maximum jobs to evaluate per run
-FEED_MIN_SCORE = 65          # Min score threshold for feed opportunities
-DAILY_EVALUATE_CAP = 120     # Safety cap: max LLM evaluations per run
+DEFAULT_MIN_SCORE = get_int("DEFAULT_MIN_SCORE", 70)
+DEFAULT_MIN_MATCHES = get_int("DAILY_TARGET_MATCHES", get_int("DEFAULT_MIN_MATCHES", 10))
+DEFAULT_MAX_PAGES_PER_QUERY = get_int("DEFAULT_MAX_PAGES_PER_QUERY", 2)
+DEFAULT_JOB_LIMIT = get_int("DEFAULT_JOB_LIMIT", 50)
+FEED_MIN_SCORE = get_int("FEED_MIN_SCORE", 65)
+DAILY_EVALUATE_CAP = get_int("DAILY_EVALUATE_CAP", 120)
 
-# Human-like timing (2026 safety playbook: 2-4s jitter, avoid fixed sleeps)
-HUMAN_DELAY_MIN = 2.0
-HUMAN_DELAY_MAX = 4.5
-CARD_CLICK_DELAY_MIN = 2.0
-CARD_CLICK_DELAY_MAX = 3.2
-SCROLL_BATCH = 4
+ENABLE_HUMAN_DELAYS = get_bool("ENABLE_HUMAN_DELAYS", False)
+HUMAN_DELAY_MIN = get_float("HUMAN_DELAY_MIN", 0.0)
+HUMAN_DELAY_MAX = get_float("HUMAN_DELAY_MAX", 0.0)
+CARD_CLICK_DELAY_MIN = get_float("CARD_CLICK_DELAY_MIN", 0.0)
+CARD_CLICK_DELAY_MAX = get_float("CARD_CLICK_DELAY_MAX", 0.0)
+SCROLL_BATCH = get_int("SCROLL_BATCH", 4)
 
-# Skill vocabulary for real keyword extraction (BM25-style pre-filter + gaps)
 SKILL_VOCAB = [
     "figma", "adobe xd", "illustrator", "photoshop", "sketch", "framer",
     "wireframing", "wireframes", "prototyping", "prototype",
@@ -69,7 +115,6 @@ SKILL_VOCAB = [
     "accessibility", "a/b testing", "cro", "analytics", "html/css",
 ]
 
-# Factor weights for calibrated scoring (role > tools > level > domain)
 FACTOR_WEIGHTS = {
     "role_fit": 0.35,
     "tools_fit": 0.30,
@@ -77,13 +122,10 @@ FACTOR_WEIGHTS = {
     "domain_fit": 0.15,
 }
 
-# Company alias map for cross-poster dedup (poster -> canonical employer)
 COMPANY_ALIASES = {
     "nextjobz": "european it institute",
     "bdjobs.com": "bdjobs",
     "mybdjobs": "bdjobs",
 }
 
-# Chrome & CDP Connection
-# If Chrome is running with `google-chrome --remote-debugging-port=9222`, connect over CDP
-CHROME_CDP_URL = "http://localhost:9222"
+CHROME_CDP_URL = get_str("CHROME_CDP_URL", "http://localhost:9222")

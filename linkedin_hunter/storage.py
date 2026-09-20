@@ -1,5 +1,3 @@
-"""Storage and reporting engine for job listings."""
-
 import csv
 import hashlib
 import json
@@ -8,42 +6,36 @@ from datetime import datetime
 from pathlib import Path
 from .config import OUTPUT_DIR, SEEN_JOBS_FILE, COMPANY_ALIASES
 
-
 def _norm_text(s: str) -> str:
     return "".join(ch for ch in (s or "").lower() if ch.isalnum() or ch.isspace()).strip()
 
-
 def normalize_company(company: str) -> str:
-    """Canonical company key resolving poster aliases (nextjobz -> european it institute)."""
+
     c = _norm_text(company)
     return COMPANY_ALIASES.get(c, c)
 
-
 def normalize_signature(title: str, company: str) -> str:
-    """Creates a normalized string signature to detect duplicate postings across queries."""
+
     t = _norm_text(title)
     c = normalize_company(company)
-    # Collapse whitespace
+
     t = re.sub(r"\s+", " ", t)
     c = re.sub(r"\s+", " ", c)
     return f"{t} @@ {c}"
 
-
 def jd_hash(description: str) -> str:
-    """Stable hash of normalized JD body — catches same JD reposted under other posters."""
+
     body = re.sub(r"\s+", " ", (_norm_text(description or "") or ""))[:2000]
     return hashlib.sha256(body.encode()).hexdigest()[:16] if body else ""
 
-
 def sanitize_md_cell(s: str, max_len: int = 80) -> str:
-    """Make a string safe for a markdown table cell: no newlines/pipes, bounded length."""
+
     s = (s or "").replace("\r", " ").replace("\n", " ")
     s = s.replace("|", "/")
     s = re.sub(r"\s+", " ", s).strip()
     if len(s) > max_len:
         s = s[: max_len - 1] + "…"
     return s or "—"
-
 
 def extract_deadline(description: str) -> str:
     m = re.search(
@@ -53,12 +45,10 @@ def extract_deadline(description: str) -> str:
     )
     return m.group(1).strip() if m else ""
 
-
 def extract_posted_hint(description: str) -> str:
-    # Detail pane rarely has posted date; card metadata sometimes does — best effort.
+
     m = re.search(r"(\d+\s+(?:hour|day|week|month)s?\s+ago|just now|today|yesterday)", description or "", re.IGNORECASE)
     return m.group(1).strip() if m else ""
-
 
 def detect_employment_type(title: str, description: str) -> str:
     text = f"{title or ''} {description or ''}".lower()
@@ -72,16 +62,14 @@ def detect_employment_type(title: str, description: str) -> str:
         return "part-time"
     return ""
 
-
 def compute_priority(score: int, employment_type: str, missing_count: int) -> str:
     if employment_type == "intern" and score >= 80:
-        return "P2"  # good lead but not a full-time target role
+        return "P2"
     if score >= 85 and missing_count <= 2:
         return "P1 apply-now"
     if score >= 75:
         return "P2"
     return "P3"
-
 
 def build_cover_hook(title: str, company: str, jd_keywords: list) -> str:
     kws = ", ".join((jd_keywords or [])[:3]) or "Figma, design systems, prototyping"
@@ -89,9 +77,8 @@ def build_cover_hook(title: str, company: str, jd_keywords: list) -> str:
     c = sanitize_md_cell(company, 40)
     return f"Pursuing the {t} at {c} — my {kws} work maps directly to your brief."
 
-
 def extract_jd_keywords(title: str, description: str, vocab: list[str] | None = None) -> list[str]:
-    """Best-effort keyword hits from JD against skill vocab (also used pre-LLM)."""
+
     try:
         from .config import SKILL_VOCAB
     except Exception:
@@ -99,13 +86,12 @@ def extract_jd_keywords(title: str, description: str, vocab: list[str] | None = 
     vocab = vocab or SKILL_VOCAB
     text = f"{title or ''}\n{description or ''}".lower()
     hits = [v for v in vocab if v.lower() in text]
-    # Prefer multi-word / most specific first, cap at 10
+
     hits.sort(key=lambda v: (-len(v), v))
     return hits[:10]
 
-
 def load_seen_state(path: Path = SEEN_JOBS_FILE) -> dict:
-    """Loads all seen job IDs, signatures, JD hashes, skip reasons, and search queries."""
+
     default_state = {
         "seen_ids": set(),
         "seen_signatures": set(),
@@ -128,7 +114,6 @@ def load_seen_state(path: Path = SEEN_JOBS_FILE) -> dict:
     except Exception:
         return default_state
 
-
 def _persist_seen(seen_state: dict, path: Path = SEEN_JOBS_FILE):
     try:
         with open(path, "w", encoding="utf-8") as f:
@@ -142,10 +127,9 @@ def _persist_seen(seen_state: dict, path: Path = SEEN_JOBS_FILE):
     except Exception:
         pass
 
-
 def save_seen_job(job_id: str, title: str, company: str, seen_state: dict | None = None,
                   path: Path = SEEN_JOBS_FILE, description: str = "", reason: str = ""):
-    """Persists a job ID, its normalized signature, and JD hash to prevent re-evaluation."""
+
     sig = normalize_signature(title, company)
     jh = jd_hash(description) if description else ""
     if seen_state is not None:
@@ -166,10 +150,9 @@ def save_seen_job(job_id: str, title: str, company: str, seen_state: dict | None
             current.setdefault("skip_reasons", {})[str(job_id)] = reason
         _persist_seen(current, path)
 
-
 def record_skip_reason(job_id: str, reason: str, seen_state: dict | None = None,
                        path: Path = SEEN_JOBS_FILE):
-    """Persist a one-line 'why skipped' explanation for an evaluated non-match."""
+
     if not reason:
         return
     if seen_state is not None:
@@ -180,9 +163,8 @@ def record_skip_reason(job_id: str, reason: str, seen_state: dict | None = None,
         current.setdefault("skip_reasons", {})[str(job_id)] = reason
         _persist_seen(current, path)
 
-
 def save_searched_query(query: str, seen_state: dict | None = None, path: Path = SEEN_JOBS_FILE):
-    """Records that a search query has been performed to avoid repeating the exact search."""
+
     q_norm = query.strip().lower()
     if seen_state is not None:
         seen_state["searched_queries"].add(q_norm)
@@ -192,9 +174,8 @@ def save_searched_query(query: str, seen_state: dict | None = None, path: Path =
         current["searched_queries"].add(q_norm)
         _persist_seen(current, path)
 
-
 def is_job_seen(job_id: str, title: str, company: str, seen_state: dict, description: str = "") -> bool:
-    """Checks ID, (title, company) signature, and JD-body hash."""
+
     if job_id and job_id in seen_state["seen_ids"]:
         return True
     sig = normalize_signature(title, company)
@@ -205,7 +186,6 @@ def is_job_seen(job_id: str, title: str, company: str, seen_state: dict, descrip
         if jh and jh in seen_state.get("seen_jd_hashes", set()):
             return True
     return False
-
 
 def get_stats(path: Path = SEEN_JOBS_FILE) -> dict:
     st = load_seen_state(path)
@@ -221,7 +201,6 @@ def get_stats(path: Path = SEEN_JOBS_FILE) -> dict:
         "searched_queries": len(st["searched_queries"]),
         "skip_reasons": reasons,
     }
-
 
 class JobStore:
     def __init__(self, output_dir: Path = OUTPUT_DIR):
@@ -241,15 +220,15 @@ class JobStore:
             return []
 
     def save_job(self, job_record: dict):
-        """Appends a new matched job (JD-hash deduped, enriched) and regenerates reports."""
+
         jobs = self.load_matched_jobs()
         new_jh = jd_hash(job_record.get("description", ""))
-        # Avoid duplicate records by ID or identical JD body
+
         for j in jobs:
             if j.get("job_id") == job_record.get("job_id"):
                 return
             if new_jh and jd_hash(j.get("description", "")) == new_jh and new_jh != "":
-                # Same JD reposted under a different poster — keep first, annotate alias
+
                 j.setdefault("aliases", [])
                 alias = f"{job_record.get('title','')} @ {job_record.get('company','')}"
                 if alias not in j["aliases"]:
@@ -260,7 +239,6 @@ class JobStore:
                 self._write_csv_report(jobs)
                 return
 
-        # Enrich + sanitize
         title = (job_record.get("title") or "").replace("\n", " ").strip()
         company = (job_record.get("company") or "").replace("\n", " ").strip()
         desc = job_record.get("description", "") or ""
@@ -281,7 +259,6 @@ class JobStore:
         job_record["saved_at"] = datetime.now().isoformat()
         jobs.append(job_record)
 
-        # Sort: P1 first, then score descending
         order = {"P1 apply-now": 0, "P1": 0, "P2": 1, "P3": 2}
         jobs.sort(key=lambda x: (order.get(str(x.get("priority", "P3")), 2), -int(x.get("match_score", 0))))
 
@@ -292,7 +269,7 @@ class JobStore:
         self._write_csv_report(jobs)
 
     def rewrite(self, jobs: list[dict]):
-        """Persist the full job list (e.g. after apply-triage) and regenerate reports."""
+
         self.output_dir.mkdir(parents=True, exist_ok=True)
         with open(self.json_file, "w", encoding="utf-8") as f:
             json.dump(jobs, f, indent=2, ensure_ascii=False)

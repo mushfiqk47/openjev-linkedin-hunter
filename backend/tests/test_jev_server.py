@@ -1,5 +1,3 @@
-"""Offline contracts for the Jev choice-contract server."""
-
 import json
 import threading
 import urllib.error
@@ -14,9 +12,7 @@ from semif_phase1.remote import RemoteClient
 LETTERS = "ABCDEFGHIJKLMNOP"
 METADATA = {"source": "fallback-model", "revision": "test", "backend": "remote"}
 
-
 class FakeClient(RemoteClient):
-    """Registered in place of a hosted server; records every request."""
 
     def __init__(self, payloads=()):
         super().__init__(base_url="http://localhost:1234/v1", model="configured-model")
@@ -29,13 +25,11 @@ class FakeClient(RemoteClient):
             raise AssertionError("unexpected model call")
         return self.payloads.pop(0)
 
-
 def letters_response(values):
     return {"choices": [{"logprobs": {"content": [{
         "token": LETTERS[0], "logprob": values[0],
         "top_logprobs": [{"token": letter, "logprob": value} for letter, value in zip(LETTERS, values)],
     }]}}], "usage": {"prompt_tokens": 12, "completion_tokens": 1}}
-
 
 def yes_no_response(yes, no):
     return {"choices": [{"logprobs": {"content": [{
@@ -43,16 +37,13 @@ def yes_no_response(yes, no):
         "top_logprobs": [{"token": "yes", "logprob": yes}, {"token": "no", "logprob": no}],
     }]}}]}
 
-
 def request_body(questions, state=None):
     return {"model": "qwen3.5-4b", "state": state or {"page": {"title": "Flights", "text": "Search flights."}},
             "questions": questions}
 
-
 def choice_question(criteria):
     return {"type": "choice", "criteria": criteria,
             "instructions": {"goal": "Find a one-way flight from Zurich to London"}}
-
 
 def test_request_needs_choice_questions_with_criteria():
     with pytest.raises(ValueError, match="JSON object"):
@@ -66,7 +57,6 @@ def test_request_needs_choice_questions_with_criteria():
     model, state, questions = jev_server.parse_request(request_body({"q": choice_question({"only": "one"})}))
     assert model == "qwen3.5-4b" and state["page"]["title"] == "Flights" and set(questions) == {"q"}
 
-
 def test_row_keeps_criterion_keys_and_renders_target_dicts():
     question = choice_question({"1": {"element": "[1] Where from?", "role": "combobox", "current_value": ""},
                                 "2": {"element": "[2] Where to?"}})
@@ -76,7 +66,6 @@ def test_row_keeps_criterion_keys_and_renders_target_dicts():
     assert row["options"][0]["description"] == "element: [1] Where from?\nrole: combobox\ncurrent_value: "
     assert row["question"] == "Find a one-way flight from Zurich to London"
 
-
 def test_single_candidate_head_answers_without_a_model_call():
     client = FakeClient([letters_response([-0.1, -2.0, -3.0, -4.0])])
     body = request_body({
@@ -85,13 +74,12 @@ def test_single_candidate_head_answers_without_a_model_call():
         "type_text_target": choice_question({"1": {"element": "[1] Where from?"}}),
     })
     result = jev_server.serve_request(client, METADATA, body)
-    assert len(client.seen) == 1  # the single-candidate head costs nothing
+    assert len(client.seen) == 1
     assert result["usage"]["questions"] == 2 and result["usage"]["model_calls"] == 1
     assert result["usage"]["elapsed_seconds"] >= 0
     assert result["answers"]["type_text_target"] == {
         "choice": "1", "probabilities": {"1": 1.0}, "confidence": 1.0,
         "prompt_version": jev_server.SINGLE_PROMPT_VERSION, "model_calls": 0}
-
 
 def test_direct_readout_is_argmax_normalized_and_forwards_the_request_model():
     client = FakeClient([letters_response([-0.2, -1.5, -4.0])])
@@ -105,12 +93,10 @@ def test_direct_readout_is_argmax_normalized_and_forwards_the_request_model():
     assert result["model"] == "qwen3.5-4b" and client.seen[0]["model"] == "qwen3.5-4b"
     assert len(client.seen[0]["messages"]) == 2
 
-
 def test_absent_request_model_falls_back_to_the_configured_source():
     client = FakeClient([letters_response([-0.3, -0.9])])
     result = jev_server.serve_request(client, METADATA, {"questions": {"q": choice_question({"a": "A", "b": "B"})}})
     assert result["model"] == "fallback-model" and client.seen[0]["model"] is None
-
 
 def test_many_criteria_use_one_binary_readout_each():
     criteria = {str(index): {"element": f"[{index}] control"} for index in range(1, 18)}
@@ -123,13 +109,11 @@ def test_many_criteria_use_one_binary_readout_each():
     assert answer["prompt_version"] == jev_server.BINARY_PROMPT_VERSION
     assert answer["choice"] in answer["probabilities"]
 
-
 def test_binary_readout_without_yes_no_logprobs_fails_loudly():
     client = FakeClient([letters_response([-0.5, -2.0])])
     criteria = {str(index): "candidate" for index in range(1, 18)}
     with pytest.raises(ValueError, match="yes/no"):
         jev_server.serve_request(client, METADATA, request_body({"q": choice_question(criteria)}))
-
 
 def test_load_configuration_reads_the_environment(monkeypatch):
     monkeypatch.delenv("SEMIF_REMOTE_MODEL", raising=False)
@@ -142,12 +126,10 @@ def test_load_configuration_reads_the_environment(monkeypatch):
     with pytest.raises(ValueError, match="SEMIF_REMOTE_TIMEOUT"):
         jev_server.load_configuration()
 
-
 def _serve(client):
     server = ThreadingHTTPServer(("127.0.0.1", 0), jev_server.make_handler(client, METADATA))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
-
 
 def _post(url, payload):
     request = urllib.request.Request(url, data=json.dumps(payload).encode(),
@@ -157,7 +139,6 @@ def _post(url, payload):
             return response.status, json.loads(response.read())
     except urllib.error.HTTPError as error:
         return error.code, json.loads(error.read() or b"null")
-
 
 def test_handler_serves_both_contract_paths_and_404s_elsewhere():
     server = _serve(FakeClient([letters_response([-0.1, -1.0])] * 2))
@@ -173,7 +154,6 @@ def test_handler_serves_both_contract_paths_and_404s_elsewhere():
     finally:
         server.shutdown()
         server.server_close()
-
 
 def test_handler_separates_bad_requests_from_upstream_failures():
     class Broken(FakeClient):

@@ -1,5 +1,3 @@
-"""Create-only JSONL command line scorer."""
-
 from __future__ import annotations
 
 import argparse
@@ -12,7 +10,6 @@ from .direct import score as direct_score
 from .reranker import score as reranker_score
 from .serial import SerialPrefixScorer
 from .shared import score_shared
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -122,7 +119,6 @@ def main() -> None:
             for row in rows:
                 destination.write(json.dumps(scorer(model, tokenizer, row, metadata, args.max_tokens), allow_nan=False) + "\n")
                 destination.flush()
-
 
 if __name__ == "__main__":
     main()

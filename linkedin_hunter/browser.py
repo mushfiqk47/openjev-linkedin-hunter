@@ -1,5 +1,3 @@
-"""Playwright browser automation for searching and extracting LinkedIn jobs."""
-
 import random
 import re
 import time
@@ -7,16 +5,18 @@ import urllib.parse
 from playwright.sync_api import Playwright, BrowserContext, Page, sync_playwright
 from .config import (
     CHROME_CDP_URL, BASE_DIR, RECENCY_FILTERS, WORK_TYPES,
-    HUMAN_DELAY_MIN, HUMAN_DELAY_MAX,
+    ENABLE_HUMAN_DELAYS, HUMAN_DELAY_MIN, HUMAN_DELAY_MAX,
     CARD_CLICK_DELAY_MIN, CARD_CLICK_DELAY_MAX,
 )
 from .storage import is_job_seen, record_skip_reason, save_seen_job, jd_hash
 
-
 def human_pause(lo: float = HUMAN_DELAY_MIN, hi: float = HUMAN_DELAY_MAX):
-    """Jittered human-like pause (replaces fixed time.sleep)."""
-    time.sleep(random.uniform(lo, hi))
 
+    if not ENABLE_HUMAN_DELAYS:
+        return
+    delay = random.uniform(lo, hi)
+    if delay > 0:
+        time.sleep(delay)
 
 def build_search_url(
     keywords: str,
@@ -26,7 +26,7 @@ def build_search_url(
     easy_apply: bool = False,
     sort_by_recent: bool = True,
 ) -> str:
-    """Builds a LinkedIn job search URL. By default, avoids restrictive work_type filters."""
+
     params = {
         "keywords": keywords,
         "origin": "JOB_SEARCH_PAGE_SEARCH_BUTTON",
@@ -34,12 +34,10 @@ def build_search_url(
     if location and location.lower() not in ("worldwide", "any", "all", ""):
         params["location"] = location
 
-    # Recency filter
     tpr = RECENCY_FILTERS.get((recency or "").lower(), "")
     if tpr:
         params["f_TPR"] = tpr
 
-    # Only append f_WT if explicitly requested and NOT 'all'/'any'
     if work_type and work_type.lower() not in ("all", "any", "none", ""):
         wt = WORK_TYPES.get(work_type.lower(), "")
         if wt:
@@ -53,14 +51,13 @@ def build_search_url(
     query_str = urllib.parse.urlencode(params)
     return f"https://www.linkedin.com/jobs/search/?{query_str}"
 
-
-def find_active_devtools_ws() -> str | None:
+def find_active_devtools_ws_candidates() -> list[str]:
     from pathlib import Path
     candidate_paths = [
-        Path.home() / ".config/BraveSoftware/Brave-Browser/DevToolsActivePort",
         Path.home() / ".config/google-chrome/DevToolsActivePort",
         Path.home() / ".config/chromium/DevToolsActivePort",
     ]
+    urls = []
     for p in candidate_paths:
         if p.exists():
             try:
@@ -68,11 +65,10 @@ def find_active_devtools_ws() -> str | None:
                 if len(lines) >= 2:
                     port = lines[0].strip()
                     ws_path = lines[1].strip()
-                    return f"ws://127.0.0.1:{port}{ws_path}"
+                    urls.append(f"ws://127.0.0.1:{port}{ws_path}")
             except Exception:
                 continue
-    return None
-
+    return urls
 
 class LinkedInBrowser:
     def __init__(self, headless: bool = False):
@@ -86,22 +82,19 @@ class LinkedInBrowser:
     def start(self):
         self.playwright = sync_playwright().start()
 
-        # 1. Check for modern Chrome/Brave DevToolsActivePort WebSocket
-        ws_url = find_active_devtools_ws()
-        if ws_url:
+        for ws_url in find_active_devtools_ws_candidates():
             try:
-                print(f"[*] Found active browser DevTools at {ws_url}...")
+                print(f"[*] Connecting to Chrome DevTools at {ws_url}...")
                 browser = self.playwright.chromium.connect_over_cdp(ws_url, timeout=12000)
                 self.browser = browser
                 self.context = browser.contexts[0]
                 self.is_cdp = True
                 self.page = self.context.new_page()
-                print("  [✓] Connected directly to your active browser via DevTools WebSocket!")
+                print("  [✓] Connected directly to your active Chrome browser via DevTools WebSocket!")
                 return
             except Exception as e:
                 print(f"  [!] Could not connect via {ws_url}: {e}")
 
-        # 2. Fallback to standard CDP URL
         try:
             print(f"[*] Trying to connect to existing Chrome at {CHROME_CDP_URL}...")
             browser = self.playwright.chromium.connect_over_cdp(CHROME_CDP_URL, timeout=12000)
@@ -114,7 +107,6 @@ class LinkedInBrowser:
         except Exception:
             print("  [!] Active Chrome CDP not found. Launching persistent browser session...")
 
-        # 3. Launch persistent Chrome context to preserve login cookies across runs
         user_data_dir = BASE_DIR / ".chrome_profile"
         user_data_dir.mkdir(parents=True, exist_ok=True)
 
@@ -156,7 +148,7 @@ class LinkedInBrowser:
                 pass
 
     def check_login(self):
-        """Checks if the user needs to sign in to LinkedIn."""
+
         self.page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=30000)
         human_pause(1.5, 2.5)
         if "login" in self.page.url or "signup" in self.page.url or "authwall" in self.page.url:
@@ -173,7 +165,7 @@ class LinkedInBrowser:
                     break
 
     def view_profile(self, profile_url: str, label: str = "") -> dict:
-        """Opens a profile in a new tab, views headline/about, and closes tab cleanly."""
+
         try:
             profile_tab = self.context.new_page()
             profile_tab.goto(profile_url, wait_until="domcontentloaded", timeout=20000)
@@ -196,11 +188,11 @@ class LinkedInBrowser:
             return {"url": profile_url}
 
     def scroll_and_scan_feed(self, max_scrolls: int = 4) -> list[dict]:
-        """Scrolls LinkedIn feed, looks for designer hiring posts and company updates."""
+
         leads = []
         print("\n[*] Navigating to LinkedIn Feed to scan for hiring opportunities...")
         self.page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=30000)
-        time.sleep(3)
+        human_pause(0.5, 3.0)
         if "login" in self.page.url or "authwall" in self.page.url:
             self.check_login()
 
@@ -208,7 +200,8 @@ class LinkedInBrowser:
         for s in range(max_scrolls):
             print(f"  [Feed] Scrolling feed (step {s + 1}/{max_scrolls})...")
             self.page.evaluate("window.scrollBy(0, 900)")
-            time.sleep(random.uniform(1.8, 2.5))
+            if ENABLE_HUMAN_DELAYS:
+                time.sleep(random.uniform(1.8, 2.5))
 
             text_blocks = self.page.query_selector_all("main span, main p, div[data-id]")
             for block in text_blocks:
@@ -242,11 +235,7 @@ class LinkedInBrowser:
         stop_check=None,
         easy_apply: bool = False,
     ):
-        """Yields raw jobs. Extract-first pattern: snapshot card data via JS, then visit details.
 
-        Returns: {job_id, title, company, location, job_url, description, company_url,
-                  recruiter_name, recruiter_url, easy_apply, posted_hint, applicants}
-        """
         if seen_state is None:
             from .storage import load_seen_state
             seen_state = load_seen_state()
@@ -255,17 +244,16 @@ class LinkedInBrowser:
         print(f"\n[*] Navigating to search: {search_url}")
         self.page.goto(search_url, wait_until="domcontentloaded", timeout=45000)
         try:
-            # Web-first wait: role-based locator preferred over fixed sleep
+
             self.page.wait_for_selector("ul.jobs-search-results-list, div.job-card-container", timeout=12000)
         except Exception:
             pass
         human_pause(2.0, 3.0)
 
-        # Ensure we are not on an authwall
         if "login" in self.page.url or "authwall" in self.page.url:
             self.check_login()
             self.page.goto(search_url, wait_until="domcontentloaded", timeout=45000)
-            time.sleep(3)
+            human_pause(0.5, 3.0)
 
         processed_count = 0
         current_page = 1
@@ -277,7 +265,6 @@ class LinkedInBrowser:
                 break
             print(f"\n[📄] Processing Search Page {current_page}/{max_pages} for '{keywords}'...")
 
-            # Scroll the left sidebar list to load items (jittered human pacing)
             for _ in range(4):
                 if stop_check and stop_check():
                     break
@@ -290,7 +277,6 @@ class LinkedInBrowser:
                 )
                 human_pause(1.2, 2.0)
 
-            # EXTRACT-FIRST: snapshot all card metadata via JS (no live handles -> no detached errors)
             snapshots = self.page.evaluate("""() => {
                 const cards = [...document.querySelectorAll('div.job-card-container, li.jobs-search-results__list-item, div[data-job-id]')];
                 return cards.slice(0, 25).map(c => {
@@ -332,11 +318,9 @@ class LinkedInBrowser:
                     if not job_id:
                         job_id = f"job_{abs(hash(title + company))}"
 
-                    # 1. Deduplication: ID + title/company + JD-hash handled after description fetch
                     if is_job_seen(job_id, title, company, seen_state):
                         continue
 
-                    # 2. Title pre-screen (negative signals before any LLM call)
                     t_lower = title.lower()
                     from .evaluator import DISQUALIFIED_TITLES
                     if any(bad in t_lower for bad in DISQUALIFIED_TITLES):
@@ -344,10 +328,8 @@ class LinkedInBrowser:
                         save_seen_job(job_id, title, company, seen_state, reason="prescreen:title")
                         continue
 
-                    # Construct clean job URL
                     job_url = f"https://www.linkedin.com/jobs/view/{job_id}/" if job_id.isdigit() else self.page.url
 
-                    # Click card by job_id selector (fresh lookup each time) to load detail pane
                     try:
                         if job_id.isdigit():
                             sel = f"div.job-card-container[data-job-id='{job_id}'], a[href*='/jobs/view/{job_id}']"
@@ -356,7 +338,7 @@ class LinkedInBrowser:
                                 el.scroll_into_view_if_needed()
                                 el.click()
                             else:
-                                # Fallback: direct navigation to job page
+
                                 self.page.goto(job_url, wait_until="domcontentloaded", timeout=30000)
                         else:
                             els = self.page.query_selector_all("div.job-card-container, li.jobs-search-results__list-item")
@@ -367,7 +349,6 @@ class LinkedInBrowser:
                         pass
                     human_pause(CARD_CLICK_DELAY_MIN, CARD_CLICK_DELAY_MAX)
 
-                    # Extract full description from detail pane (web-first wait)
                     try:
                         self.page.wait_for_selector("#job-details, .jobs-description__content", timeout=6000)
                     except Exception:
@@ -377,19 +358,16 @@ class LinkedInBrowser:
                     if not description:
                         description = f"Job Title: {title}\nCompany: {company}\nLocation: {loc}"
 
-                    # JD-hash dedup: same body reposted by another poster
                     if jd_hash(description) and jd_hash(description) in seen_state.get("seen_jd_hashes", set()):
                         print(f"  [⊘] JD-dedup: identical description already seen '{title}'.")
                         save_seen_job(job_id, title, company, seen_state, description=description, reason="dedup:jd-hash")
                         continue
 
-                    # Extract company URL
                     comp_link = self.page.query_selector(".job-details-jobs-unified-top-card__company-name a, a[href*='/company/']")
                     company_url = comp_link.get_attribute("href") if comp_link else ""
                     if company_url and not company_url.startswith("http"):
                         company_url = f"https://www.linkedin.com{company_url}"
 
-                    # Easy Apply + posted/applicants metadata (best effort)
                     detail_text = ""
                     try:
                         detail_text = self.page.query_selector(
@@ -407,7 +385,6 @@ class LinkedInBrowser:
                     if m_app:
                         applicants = m_app.group(1).strip()
 
-                    # Extract recruiter / hiring lead info
                     recruiter_name = ""
                     recruiter_url = ""
                     hirer_card = self.page.query_selector(".hirer-card, .jobs-poster, [data-view-name*='job-poster'], .jobs-hiring-team")
@@ -420,11 +397,9 @@ class LinkedInBrowser:
                                 recruiter_url = f"https://www.linkedin.com{recruiter_url}"
                             print(f"    [👤] Found Hiring Lead: {recruiter_name} ({recruiter_url})")
 
-                    # Optionally view recruiter profile
                     if view_profiles and recruiter_url:
                         self.view_profile(recruiter_url, label=f"Recruiter: {recruiter_name}")
 
-                    # Optionally click "Save" on LinkedIn
                     if save_on_linkedin:
                         try:
                             save_btn = self.page.query_selector("button.jobs-save-button")
@@ -434,7 +409,6 @@ class LinkedInBrowser:
                         except Exception:
                             pass
 
-                    # Mark seen immediately (with JD hash)
                     save_seen_job(job_id, title, company, seen_state, description=description)
 
                     processed_count += 1
@@ -459,7 +433,6 @@ class LinkedInBrowser:
                     print(f"    [!] Error reading card {i}: {e}")
                     continue
 
-            # Check if pagination is needed
             if current_page >= max_pages or processed_count >= limit:
                 break
 
@@ -467,7 +440,7 @@ class LinkedInBrowser:
             print(f"[*] Navigating to page {current_page}...")
 
             navigated = False
-            # 1. Try Next button
+
             try:
                 next_btn = self.page.query_selector('button[aria-label="View next page"], button[aria-label="Next"], button.jobs-search-pagination__button--next')
                 if next_btn and not next_btn.get_attribute("disabled"):
@@ -477,7 +450,6 @@ class LinkedInBrowser:
             except Exception:
                 pass
 
-            # 2. Try specific page number button
             if not navigated:
                 try:
                     p_btn = self.page.query_selector(f'button[aria-label="Page {current_page}"]')
@@ -488,7 +460,6 @@ class LinkedInBrowser:
                 except Exception:
                     pass
 
-            # 3. Fallback: navigate directly via start offset
             if not navigated:
                 start_offset = (current_page - 1) * 25
                 next_page_url = f"{search_url}&start={start_offset}"
@@ -512,12 +483,7 @@ class LinkedInBrowser:
         stop_check=None,
         exhaustive: bool = False,
     ) -> int:
-        """Navigates to LinkedIn feed, scrolls continuously, checks posts against candidate CV, and saves qualifying leads.
 
-        With ``exhaustive`` (feature 2) the scan no longer stops at the target
-        match count: every visible post is evaluated and every non-match records a
-        one-line reason, bounded only by ``max_scrolls`` / the stop flag.
-        """
         print("\n" + "=" * 65)
         print(f"📰 Navigating to LinkedIn News Feed to scan posts for hiring leads...")
         print(f"   🎯 Goal: Find at least {target_matches} matching opportunities (Current: {current_matched})")
@@ -548,7 +514,6 @@ class LinkedInBrowser:
             if on_status_update:
                 on_status_update(f"Scanning LinkedIn feed (Scroll {scroll_idx + 1}/{max_scrolls}) · Matches: {matched_count}/{target_matches}")
 
-            # 1. Expand all collapsed "...more" / "...see more" buttons on feed
             try:
                 self.page.evaluate(r'''() => {
                     const buttons = Array.from(document.querySelectorAll("button"));
@@ -559,11 +524,10 @@ class LinkedInBrowser:
                         }
                     }
                 }''')
-                time.sleep(0.4)
+                human_pause(0, 0.4)
             except Exception:
                 pass
 
-            # 2. Extract visible feed posts from DOM
             posts_data = self.page.evaluate(r'''() => {
                 const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
                 const results = [];
@@ -624,14 +588,12 @@ class LinkedInBrowser:
                 if len(text) < 35:
                     continue
 
-                # Deduplication by author and text prefix
                 sig = f"feed @@ {author.lower()} @@ {text[:70].lower()}"
                 if sig in seen_state["seen_signatures"]:
                     continue
                 seen_state["seen_signatures"].add(sig)
                 new_unseen_in_batch += 1
 
-                # Keyword pre-filter: must contain hiring or design indicators
                 hiring_keywords = [
                     "hiring", "looking for", "join our team", "join us", "we're hiring", "were hiring",
                     "open role", "open position", "opening", "openings", "opportunity", "opportunities",
@@ -704,7 +666,6 @@ class LinkedInBrowser:
             else:
                 consecutive_idle_scrolls = 0
 
-            # Scroll down for next batch of feed posts (targets main#workspace, window, and PageDown key)
             try:
                 self.page.evaluate(r'''() => {
                     const dy = 1000 + Math.floor(Math.random()*500);

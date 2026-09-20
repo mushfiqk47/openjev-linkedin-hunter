@@ -1,18 +1,3 @@
-"""Hunting core: one deep Module behind a small Interface.
-
-Seam: `run_hunt(params, deps, hooks)` is the single place where hunting behaviour lives.
-Adapters: CLI (`hunter.py`) and Web (`web.py`) are thin adapters translating
-argparse / JSON into HuntParams plus log/stop hooks. Two adapters = real seam.
-
-Depth: query rotation, dedup, BM25-gated SemIf evaluation, JD-hash save,
-feed fallback, and caps all sit behind one 3-arg function. Deletion test:
-deleting this Module pushes branching, thresholds, and ordering back into
-every caller. Keeping it gives Leverage to callers and Locality to maintainers.
-
-Test surface is the Interface: fakes cross the same seam (FakeEvaluator,
-iterable fake browser, in-memory store). No LM Studio or Playwright needed.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -21,10 +6,8 @@ from typing import Callable, Iterable, Protocol
 from .config import DEFAULT_QUERIES, DEFAULT_MIN_SCORE, DEFAULT_MIN_MATCHES
 from .storage import record_skip_reason, save_searched_query
 
-
 @dataclass
 class HuntParams:
-    """Everything a caller must know: plain data, no behaviour."""
 
     query: str = "UI/UX Designer"
     location: str = ""
@@ -43,10 +26,8 @@ class HuntParams:
     feed_only: bool = False
     max_feed_scrolls: int = 8
     criteria: list[str] | None = None
-    # Feature 2: caps are soft by default so every card/feed post is evaluated and
-    # reasoned about. Set True to restore the old daily_cap/limit early-stop safety.
-    enforce_caps: bool = False
 
+    enforce_caps: bool = False
 
 @dataclass
 class HuntResult:
@@ -55,37 +36,30 @@ class HuntResult:
     skipped: int = 0
     saved_job_ids: list[str] = field(default_factory=list)
 
-
 class Evaluator(Protocol):
     def evaluate(self, job_title: str, company: str, job_description: str,
                  criteria: list[str] | None = None) -> dict: ...
     def evaluate_feed_post(self, author: str, post_text: str,
                            criteria: list[str] | None = None) -> dict: ...
 
-
 @dataclass
 class HuntDeps:
-    """Accepted dependencies — never created inside the Module (testability)."""
 
     evaluator: Evaluator
-    store: object  # JobStore: save_job(record)
+    store: object
     seen_state: dict
-    # Factory so tests inject a fake browser; prod passes LinkedInBrowser.
+
     search_jobs: Callable[..., Iterable[dict]]
     browse_feed: Callable[..., int] | None = None
-    # Query recorder; defaults to persistent save_searched_query so tests can
-    # inject a no-op and stay hermetic (no real seen_jobs.json writes).
-    record_query: Callable[..., None] | None = None
-    # Skip-reason recorder; same injectable pattern so tests never write
-    # seen_jobs.json.
-    record_skip: Callable[..., None] | None = None
 
+    record_query: Callable[..., None] | None = None
+
+    record_skip: Callable[..., None] | None = None
 
 @dataclass
 class HuntHooks:
     on_event: Callable[[str, str], None] = lambda msg, level="info": None
     should_stop: Callable[[], bool] = lambda: False
-
 
 def build_queries(initial: str, auto_rotate: bool) -> list[str]:
     queries = [initial]
@@ -93,9 +67,8 @@ def build_queries(initial: str, auto_rotate: bool) -> list[str]:
         queries += [q for q in DEFAULT_QUERIES if q.lower() != initial.lower()]
     return queries
 
-
 def run_hunt(params: HuntParams, deps: HuntDeps, hooks: HuntHooks = HuntHooks()) -> HuntResult:
-    """Run the full hunt: search phase then feed fallback. Small Interface, deep Implementation."""
+
     result = HuntResult()
     seen = deps.seen_state
 
@@ -118,7 +91,6 @@ def run_hunt(params: HuntParams, deps: HuntDeps, hooks: HuntHooks = HuntHooks())
         (deps.record_query or save_searched_query)(q, seen)
         hooks.on_event(f"Searching [{q_idx + 1}]: '{q}' ({result.matched}/{params.min_matches})", "info")
 
-        # Exhaustive triage: pass the full per-query bound unless caps are enforced.
         remaining = (cap - result.evaluated) if params.enforce_caps else params.limit
         for raw_job in deps.search_jobs(
             keywords=q, location=params.location, recency=params.recency,
@@ -164,7 +136,6 @@ def run_hunt(params: HuntParams, deps: HuntDeps, hooks: HuntHooks = HuntHooks())
             f"Search gave {result.matched}/{params.min_matches}. Falling back to feed.", "warning")
         result.matched = _feed_phase(params, deps, hooks, result, current_matched=result.matched)
     return result
-
 
 def _feed_phase(params: HuntParams, deps: HuntDeps, hooks: HuntHooks,
                 result: HuntResult, current_matched: int) -> int:

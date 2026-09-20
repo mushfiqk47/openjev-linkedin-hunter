@@ -1,17 +1,3 @@
-"""Continuous apply-triage agent.
-
-Feature 3: once a posting is matched, chain cheap model judgments into the *next
-actions* a human would otherwise decide by hand — employer fit, cover-letter
-angle, recruiter opener, freshness, and a single recommended action. Every step
-is a yes/no, ranking, or classification readout on the same SemIf seam, so the
-job record ends up richer without any generated text or parsing.
-
-Run it over the saved matches:
-
-    python -m linkedin_hunter.triage            # triage every saved match
-    python -m linkedin_hunter.triage --dry-run  # print, do not write back
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -23,7 +9,6 @@ from .config import LLM_BASE_URL, LLM_MODEL
 from .cv_loader import get_candidate_profile_prompt
 from .judgments import Judge
 
-#: Recommended next action for a triaged posting.
 NEXT_ACTIONS = {
     "apply_now": "Apply now — strong fit and hireable now.",
     "outreach_recruiter": "Message the hiring lead first — good fit, relationship helps.",
@@ -31,7 +16,6 @@ NEXT_ACTIONS = {
     "skip": "Skip — not worth the application effort.",
 }
 
-#: Prepared cover-letter angles, ranked against the posting (never generated).
 COVER_ANGLES = {
     "design_systems": "Design systems, component libraries and design tokens at scale",
     "figma_craft": "Hands-on Figma craft: wireframes, prototyping and auto-layout",
@@ -48,15 +32,12 @@ FRESHNESS_LABELS = {
     "unknown": "No posting date visible.",
 }
 
-
 def _first_name(author: str) -> str:
     parts = [p for p in re.split(r"\s+", (author or "").strip()) if p]
     return parts[0] if parts else "there"
 
-
 @dataclass
 class Triaged:
-    """Triage output for one posting, ready to merge into its job record."""
 
     next_action: str
     action_confidence: float
@@ -79,9 +60,7 @@ class Triaged:
             "triage_calls": self.model_calls,
         }
 
-
 class ApplyTriage:
-    """Chain of instant judgments over one posting."""
 
     def __init__(self, base_url: str = LLM_BASE_URL, model: str = LLM_MODEL,
                  client=None, meta: dict | None = None):
@@ -160,7 +139,7 @@ Description:
         )
 
     def triage(self, job: dict) -> dict:
-        """Run the full chain for one posting and return fields to merge in."""
+
         state = self._state(job)
         calls = 0
         employer_fit, seconds_e = self.employer_fit(job, state)
@@ -185,12 +164,10 @@ Description:
         )
         return result.to_dict()
 
-
 def triage_job(job: dict, judge_client=None, meta: dict | None = None) -> dict:
-    """Convenience wrapper: triage one job dict, injecting a fake client in tests."""
+
     agent = ApplyTriage(client=judge_client, meta=meta)
     return agent.triage(job)
-
 
 def main() -> None:
     from .storage import JobStore
@@ -224,7 +201,6 @@ def main() -> None:
 
     store.rewrite(triaged)
     print(f"[✓] Triage written to {store.json_file}")
-
 
 if __name__ == "__main__":
     main()

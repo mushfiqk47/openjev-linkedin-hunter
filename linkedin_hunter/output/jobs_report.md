@@ -1,6 +1,6 @@
 # 🎯 LinkedIn Matched Jobs Report
-**Last Updated:** 2026-09-20 19:07:06  
-**Total Matched Opportunities:** 8 (4 jobs + 4 network leads)  
+**Last Updated:** 2026-09-21 04:25:39  
+**Total Matched Opportunities:** 11 (4 jobs + 7 network leads)  
 
 ## ⚡ Top 3 — Apply Now
 
@@ -74,13 +74,26 @@
 | Score | Author | Type | Link |
 |:-----:|:-------|:----:|:----:|
 | 🟢 **94%** | Ubada Forayaje | — | [View](https://www.linkedin.com/in/ubadaforayaje/) |
+| 🟢 **94%** | Ubada Forayaje | full-time | [View](https://www.linkedin.com/in/ubadaforayaje/) |
+| 🟢 **93%** | Ubada Forayaje | — | [View](https://www.linkedin.com/in/ubadaforayaje/) |
 | 🟢 **87%** | Ubada Forayaje | — | [View](https://www.linkedin.com/in/ubadaforayaje/) |
 | 🟢 **93%** | Ubada Forayaje | intern | [View](https://www.linkedin.com/in/ubadaforayaje/) |
+| 🟡 **79%** | Mediusware | full-time | [View](https://www.linkedin.com/company/mediusware/) |
 | 🟡 **77%** | Mediusware | full-time | [View](https://www.linkedin.com/company/mediusware/) |
 
 ### Design Hiring Opportunity (Post by Ubada Forayaje)
 - **Score:** **94%** · Type: 
 - **Why:** Strong hiring lead (100%). Active UI/UX / product design opportunity. Scored in 0.34s via SemIf direct readout.
+- **Link:** [https://www.linkedin.com/in/ubadaforayaje/](https://www.linkedin.com/in/ubadaforayaje/)
+
+### Design Hiring Opportunity (Post by Ubada Forayaje)
+- **Score:** **94%** · Type: full-time
+- **Why:** Strong hiring lead (94% calibrated, raw 100%). Type: full-time. Scored in 0.31s via SemIf.
+- **Link:** [https://www.linkedin.com/in/ubadaforayaje/](https://www.linkedin.com/in/ubadaforayaje/)
+
+### Design Hiring Opportunity (Post by Ubada Forayaje)
+- **Score:** **93%** · Type: 
+- **Why:** Strong hiring lead (93% calibrated, raw 99%). Type: unspecified. Scored in 0.26s via SemIf.
 - **Link:** [https://www.linkedin.com/in/ubadaforayaje/](https://www.linkedin.com/in/ubadaforayaje/)
 
 ### Design Hiring Opportunity (Post by Ubada Forayaje)
@@ -92,6 +105,11 @@
 - **Score:** **93%** · Type: intern
 - **Why:** Strong hiring lead (99%). Active UI/UX / product design opportunity. Scored in 0.38s via SemIf direct readout.
 - **Link:** [https://www.linkedin.com/in/ubadaforayaje/](https://www.linkedin.com/in/ubadaforayaje/)
+
+### Design Hiring Opportunity (Post by Mediusware)
+- **Score:** **79%** · Type: full-time
+- **Why:** Potential lead (79% calibrated, raw 84%). Type: full-time. Scored in 0.39s via SemIf.
+- **Link:** [https://www.linkedin.com/company/mediusware/](https://www.linkedin.com/company/mediusware/)
 
 ### Design Hiring Opportunity (Post by Mediusware)
 - **Score:** **77%** · Type: full-time

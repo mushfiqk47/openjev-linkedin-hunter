@@ -1,25 +1,11 @@
-"""SemIf-powered Job Decision Evaluator.
-
-Reads native model logprobs directly from LM Studio in a single forward pass (<0.3s).
-Multi-factor calibrated scoring: BM25 pre-filter + logprob readout + model-judged axes.
-Zero generated tokens, zero JSON parsing failures, zero timeouts.
-
-Feature 1 (multi-axis model scoring): the ``role/tools/level/domain`` breakdown is
-now scored by the model itself (four two-option readouts) and blended into the fit
-score, replacing the old regex heuristics. The deterministic heuristics remain as a
-fallback for the no-model prescreen path and when ``use_model_axes=False``.
-"""
-
 import re
 import sys
 from .config import FACTOR_WEIGHTS, LLM_BASE_URL, LLM_MODEL, PROJECT_ROOT, SKILL_VOCAB
 from .cv_loader import get_candidate_profile_prompt
 from .judgments import Judge, weighted_axes
 
-# Import the core SemIf scoring engine from backend/src
 sys.path.insert(0, str(PROJECT_ROOT / "backend" / "src"))
 
-# Blend between the calibrated save/skip decision and the model-judged axes.
 DECISION_WEIGHT = 0.5
 AXES_WEIGHT = 0.5
 
@@ -30,7 +16,6 @@ DEFAULT_CRITERIA = [
     "[Dealbreaker] Does NOT require 8+ years executive/director leadership or full-stack software development/coding.",
 ]
 
-# Candidate-owned skills (from Mushfiq_Kabir_CV.json) — used for real gap analysis
 CANDIDATE_SKILLS = {
     "figma", "adobe xd", "illustrator", "photoshop", "sketch",
     "wireframing", "wireframes", "prototyping", "prototype",
@@ -50,26 +35,23 @@ DISQUALIFIED_TITLES = [
     "fashion designer",
 ]
 
-
 def keyword_hits(title: str, description: str) -> list[str]:
     text = f"{title or ''}\n{description or ''}".lower()
     hits = [v for v in SKILL_VOCAB if v.lower() in text]
     hits.sort(key=lambda v: (-len(v), v))
     return hits[:10]
 
-
 def extract_matched_missing(title: str, description: str):
     hits = keyword_hits(title, description)
     matched, missing = [], []
     for h in hits:
         (matched if h.lower() in CANDIDATE_SKILLS else missing).append(h.title() if len(h) <= 8 else h)
-    # Title-case short tokens nicely
+
     matched = [m if m != "Ui/Ux" else "UI/UX" for m in matched]
     return matched, missing, hits
 
-
 def bm25_prescreen(title: str, description: str):
-    """Cheap negative-signal gate (Indeed bad-match pattern). Returns SKIP dict or None."""
+
     t = (title or "").lower()
     if any(bad in t for bad in DISQUALIFIED_TITLES):
         return {"match_score": 8, "fit_level": "SKIP", "prescreen": "disqualified-title"}
@@ -79,21 +61,15 @@ def bm25_prescreen(title: str, description: str):
         return {"match_score": 12, "fit_level": "SKIP", "prescreen": "no-design-signal"}
     return None
 
-
 def calibrate(raw: int) -> tuple[int, bool]:
-    """Compress saturated 80-100% band (instruct-model overconfidence). Monotonic, cap 94.
 
-    Maps: 100->94, 99->93, 98->92, 95->90, 90->85, 85->81, 80->76. Below 80 unchanged.
-    Returns (calibrated_score, was_compressed).
-    """
     if raw >= 80:
         cal = min(94, int(raw * 0.92 + 2))
         return cal, True
     return raw, False
 
-
 def factor_breakdown(title: str, description: str) -> dict:
-    """Deterministic fallback axes (regex/vocabulary). Used before any model call."""
+
     text = f"{title or ''}\n{description or ''}".lower()
     t = (title or "").lower()
 
@@ -103,7 +79,6 @@ def factor_breakdown(title: str, description: str) -> dict:
     tools_hits = sum(1 for k in ["figma", "wirefram", "prototyp", "design system", "component librar", "design token"] if k in text)
     tools_fit = min(95, 25 + tools_hits * 18)
 
-    # Level: 1-5yr ideal; 8+ leadership or heavy code is a dealbreaker
     if re.search(r"8\+\s*years|10\+?\s*years|director|principal.*lead|staff.*lead", text):
         level_fit = 20
     elif re.search(r"intern", text):
@@ -119,10 +94,8 @@ def factor_breakdown(title: str, description: str) -> dict:
 
     return {"role_fit": role_fit, "tools_fit": tools_fit, "level_fit": level_fit, "domain_fit": domain_fit}
 
-
 def weighted_hint(fb: dict) -> int:
     return int(round(sum(fb[k] * FACTOR_WEIGHTS[k] for k in FACTOR_WEIGHTS)))
-
 
 def detect_employment_type(title: str, description: str) -> str:
     text = f"{title or ''} {description or ''}".lower()
@@ -136,14 +109,12 @@ def detect_employment_type(title: str, description: str) -> str:
         return "part-time"
     return ""
 
-
 def blend_score(decision_pct: int, axes_hint: int) -> int:
-    """Combine the save/skip readout with the model-judged axes into one fit score."""
+
     return int(round(DECISION_WEIGHT * decision_pct + AXES_WEIGHT * axes_hint))
 
-
 def choose_skip_reason(axes: dict, missing: list[str], fit_level: str) -> str:
-    """One-line explanation for a skipped posting (feature 2: actionable reasons)."""
+
     if fit_level == "ERROR":
         return "Evaluation error; not scored."
     weakest = min(axes, key=axes.get) if axes else ""
@@ -159,16 +130,10 @@ def choose_skip_reason(axes: dict, missing: list[str], fit_level: str) -> str:
         return f"Missing core signals: {', '.join(missing[:3])}."
     return "Below the fit threshold."
 
-
 class JobEvaluator:
     def __init__(self, base_url: str = LLM_BASE_URL, model: str = LLM_MODEL,
                  client=None, meta: dict | None = None, use_model_axes: bool = True):
-        """Accept a prebuilt client (fake adapter in tests); create one only when absent.
 
-        ``use_model_axes`` spends four extra readouts per posting to judge the fit
-        axes with the model instead of regex heuristics. Set it False to keep the
-        old single-readout cost profile.
-        """
         self.model = model
         self.base_url = base_url
         self.use_model_axes = use_model_axes
@@ -182,13 +147,13 @@ class JobEvaluator:
         return readout, readout.probabilities[0], readout.seconds
 
     def _axes(self, state: str, title: str, description: str) -> tuple[dict, float]:
-        """Model-judged axes when enabled, deterministic fallback otherwise."""
+
         if self.use_model_axes:
             return self.judge.axis_scores(state)
         return factor_breakdown(title, description), 0.0
 
     def evaluate(self, job_title: str, company: str, job_description: str, criteria: list[str] | None = None) -> dict:
-        """Multi-factor calibrated fit: prescreen -> SemIf logprob + model axes -> skills/gaps."""
+
         pre = bm25_prescreen(job_title, job_description)
         matched, missing, hits = extract_matched_missing(job_title, job_description)
         heuristic_fb = factor_breakdown(job_title, job_description)
@@ -322,7 +287,7 @@ Description:
             }
 
     def evaluate_feed_post(self, author: str, post_text: str, criteria: list[str] | None = None) -> dict:
-        """Feed-post hiring-lead check with employment-type tagging (intern-aware)."""
+
         crit_list = criteria if criteria and len(criteria) > 0 else DEFAULT_CRITERIA
         criteria_text = "\n".join(f"- {c}" for c in crit_list)
 
@@ -373,7 +338,7 @@ Post Content:
         try:
             res, save_prob, fwd = self._score_row(row)
             raw = int(round(save_prob * 100))
-            # Intern penalty: interns rarely match a 2-4yr full-time target
+
             if emp == "intern":
                 raw = min(raw, 78)
             cal, compressed = calibrate(raw)

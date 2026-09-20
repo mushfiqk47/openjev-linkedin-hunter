@@ -1,10 +1,3 @@
-"""Local decision UI backed by a hosted model (LM Studio, ...).
-
-Serves a single dependency-free page where you paste a state, question and
-options, then scores them through the ``remote`` backend configured from
-the ``.env`` file. Stdlib only; no build step, no CDN, no telemetry.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -96,9 +89,8 @@ document.getElementById("run").onclick = async () => {
 </html>
 """
 
-
 def normalize_options(options) -> list[dict]:
-    """Accept description strings or {id, description} objects."""
+
     normalized = []
     for index, option in enumerate(options):
         if isinstance(option, str):
@@ -110,9 +102,8 @@ def normalize_options(options) -> list[dict]:
             raise ValueError("Each option must be a string or an {id, description} object")
     return normalized
 
-
 def score_decision(client, metadata: dict, payload: dict) -> dict:
-    """Validate a UI payload and score it through the remote backend."""
+
     if not isinstance(payload, dict):
         raise ValueError("Request body must be a JSON object")
     state = payload.get("state", "")
@@ -126,7 +117,6 @@ def score_decision(client, metadata: dict, payload: dict) -> dict:
     }
     validate_row(row)
     return remote_backend.score(client, None, row, metadata)
-
 
 def make_handler(client, metadata):
     class Handler(BaseHTTPRequestHandler):
@@ -159,7 +149,7 @@ def make_handler(client, metadata):
             except (ValueError, json.JSONDecodeError) as error:
                 self._send(400, json.dumps({"error": str(error)}).encode(), "application/json")
                 return
-            except Exception as error:  # host unreachable, bad logprobs, ...
+            except Exception as error:
                 self._send(502, json.dumps({"error": str(error)}).encode(), "application/json")
                 return
             self._send(200, json.dumps(result, allow_nan=False).encode(), "application/json")
@@ -168,7 +158,6 @@ def make_handler(client, metadata):
             pass
 
     return Handler
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Serve the local SemIf decision UI.")
@@ -199,7 +188,6 @@ def main() -> None:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
-
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,3 @@
-"""Main CLI entrypoint for LinkedIn Job Hunter (thin Adapter over hunt_core)."""
-
 import argparse
 import sys
 from .config import (
@@ -12,7 +10,6 @@ from .evaluator import JobEvaluator
 from .browser import LinkedInBrowser
 from .hunt_core import HuntDeps, HuntHooks, HuntParams, run_hunt
 from .storage import JobStore, load_seen_state
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -144,7 +141,6 @@ def main():
     print(f"   Max Pages / Query:  {args.max_pages}")
     print("=" * 68)
 
-    # 1. Load Candidate Profile
     try:
         cv = load_cv_data()
         name = cv.get("basics", {}).get("name", "Mushfiq Kabir")
@@ -153,14 +149,12 @@ def main():
         print(f"[✗] Failed to load CV: {e}")
         sys.exit(1)
 
-    # 2. Initialize Evaluator & Storage
     evaluator = JobEvaluator()
     store = JobStore()
     seen_state = load_seen_state()
     print(f"[✓] Connected to local evaluator (LM Studio: {evaluator.model})")
     print(f"[✓] Memory: {len(seen_state['seen_ids'])} job IDs, {len(seen_state['seen_signatures'])} signatures, {len(seen_state['searched_queries'])} queries recorded")
 
-    # 3. Thin Adapter: argparse -> HuntParams, print hooks -> HuntHooks
     params = HuntParams(
         query=args.query, location=args.location, recency=args.recency,
         work_type=args.work_type, min_matches=args.min_matches, min_score=args.min_score,
@@ -176,7 +170,6 @@ def main():
         tag = {"match": "[★]", "success": "[✓]", "warning": "[!]"}.get(level, "[i]")
         print(f"  {tag} {msg}")
 
-    # 4. Start Browser (injected dependency, not created inside the Module)
     browser = LinkedInBrowser(headless=args.headless)
 
     try:
@@ -201,7 +194,6 @@ def main():
         print("\n[!] Run stopped by user.")
     finally:
         browser.close()
-
 
 if __name__ == "__main__":
     main()

@@ -1,8 +1,3 @@
-"""Verify that the machine-readable summary is backed by committed raw evidence.
-
-The published evidence bundles (`results/`) are not included in this checkout;
-regenerate them with the commands in `benchmarks/README.md` before running.
-"""
 from collections import defaultdict
 import json
 import sys
@@ -20,11 +15,9 @@ REQUIRED_INPUTS = (
     "results/raw/shape777-reranker.predictions.jsonl",
 )
 
-
 def load(path):
     with (ROOT / path).open() as stream:
         return json.load(stream)
-
 
 def close(left, right, tolerance=5e-10):
     if isinstance(left, (int, float)) and isinstance(right, (int, float)):
@@ -33,14 +26,11 @@ def close(left, right, tolerance=5e-10):
     elif left != right:
         raise AssertionError(f"{left!r} != {right!r}")
 
-
 def top_choice(row):
     return row["option_ids"][max(range(len(row["probabilities"])), key=row["probabilities"].__getitem__)]
 
-
 def rows(path):
     return [json.loads(line) for line in (ROOT / path).read_text().splitlines() if line.strip()]
-
 
 def main():
     missing = [path for path in REQUIRED_INPUTS if not (ROOT / path).exists()]
@@ -139,7 +129,6 @@ def main():
     checks += 5
     print(json.dumps({"verified_summary_claims": checks, "status": "ok"}))
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main() or 0)

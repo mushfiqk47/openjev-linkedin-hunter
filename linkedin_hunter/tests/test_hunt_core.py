@@ -8,7 +8,6 @@ JOBS = [
     {"job_id": "3", "title": "C", "company": "Gamma", "description": "design ui"},
 ]
 
-
 def make_deps(evaluator, skips):
     def search_jobs(**kwargs):
         return list(JOBS)
@@ -23,7 +22,6 @@ def make_deps(evaluator, skips):
         record_skip=lambda job_id, reason, seen: skips.append((job_id, reason)),
     )
 
-
 def test_exhaustive_evaluates_every_yielded_job_and_reasons_skips():
     evaluator = FakeEvaluator(scores={"A": 90})
     skips = []
@@ -32,13 +30,12 @@ def test_exhaustive_evaluates_every_yielded_job_and_reasons_skips():
 
     result = run_hunt(params, deps, HuntHooks())
 
-    assert result.evaluated == 3          # no cap early-stop by default
+    assert result.evaluated == 3
     assert result.matched == 1
     assert result.skipped == 2
     assert len(deps.store.saved) == 1
-    assert all(reason for _job_id, reason in skips)  # every skip carries a reason
+    assert all(reason for _job_id, reason in skips)
     assert {job_id for job_id, _ in skips} == {"2", "3"}
-
 
 def test_enforce_caps_restores_early_stop():
     evaluator = FakeEvaluator(scores={})

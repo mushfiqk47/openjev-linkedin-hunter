@@ -1,5 +1,3 @@
-"""Rebuild Every's 204 inference rows and 154 author-labeled rows without executing its archive."""
-
 from __future__ import annotations
 
 import argparse
@@ -7,7 +5,6 @@ import json
 from pathlib import Path
 import re
 import zipfile
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -128,7 +125,6 @@ def main() -> None:
         + "\n"
     )
     print("wrote 204 inference rows, 154 labeled rows, and firewall actions")
-
 
 if __name__ == "__main__":
     main()

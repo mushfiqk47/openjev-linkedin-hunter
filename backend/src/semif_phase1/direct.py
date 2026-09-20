@@ -1,5 +1,3 @@
-"""Direct categorical decision readout from native next-token logits."""
-
 from __future__ import annotations
 
 import inspect
@@ -8,7 +6,6 @@ import time
 from .core import LETTERS, digest, direct_messages, softmax
 
 PROMPT_VERSION = "direct-options-v1"
-
 
 def _slot_ids(tokenizer, count: int) -> list[int]:
     result = []
@@ -21,7 +18,6 @@ def _slot_ids(tokenizer, count: int) -> list[int]:
         raise ValueError("Answer-slot tokens collide")
     return result
 
-
 def _forward(model, inputs):
     parameters = inspect.signature(model.forward).parameters
     kwargs = dict(inputs, use_cache=False, return_dict=True)
@@ -29,9 +25,8 @@ def _forward(model, inputs):
         kwargs["logits_to_keep"] = 1
     return model(**kwargs).logits[:, -1, :]
 
-
 def encode_prompt(tokenizer, row: dict, max_tokens: int) -> tuple[list[int], list[int], str]:
-    """Encode one decision and verify its single-token answer slots."""
+
     prompt = tokenizer.apply_chat_template(
         direct_messages(row), tokenize=False, add_generation_prompt=True, enable_thinking=False
     )
@@ -43,7 +38,6 @@ def encode_prompt(tokenizer, row: dict, max_tokens: int) -> tuple[list[int], lis
         if tokenizer.encode(prompt + letter, add_special_tokens=False) != ids + [token]:
             raise ValueError(f"Answer boundary changes tokenization for slot {letter}")
     return ids, slots, digest(prompt)
-
 
 def score(model, tokenizer, row: dict, metadata: dict, max_tokens: int = 4096) -> dict:
     import torch
