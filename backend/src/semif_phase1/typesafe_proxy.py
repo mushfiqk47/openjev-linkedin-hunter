@@ -1,33 +1,3 @@
-"""Local API-key proxy for the TypeSafe (Jev) System One endpoint.
-
-TypeSafe expects one secret API key and its ``POST /v1/systemone`` contract is
-not OpenAI-compatible, so client tooling cannot talk to it directly. This
-stdlib-only proxy sits in front of it:
-
-* generates a *local* key (``SEMIF_PROXY_API_KEY``) that clients use;
-* keeps the real TypeSafe key (``TYPESAFE_API_KEY``) only in the env file;
-* forwards every path, injecting the real key server-side, so the real key
-  never leaves this machine's process environment;
-* retries ``429``/``529`` with exponential backoff, as the API docs advise.
-
-Nothing is sent anywhere except ``TYPESAFE_API_BASE``. Stdlib only, matching
-the ``remote`` backend's constraints.
-
-Quick start::
-
-    # 1. paste the real TypeSafe key into .env (never on the command line)
-    #    TYPESAFE_API_KEY=ts_live_...
-    # 2. generate the local key clients will use
-    semif-proxy --generate-key
-    # 3. run the proxy
-    semif-proxy
-    # 4. point any client at the proxy instead of api.typesafe.ai
-    curl -X POST http://127.0.0.1:4001/typesafe/v1/systemone \\
-      -H "Authorization: Bearer $SEMIF_PROXY_API_KEY" \\
-      -H 'Content-Type: application/json' \\
-      -d '{"state": "...", "model": "jev-latest", "questions": {...}}'
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -45,7 +15,6 @@ from pathlib import Path
 
 from .remote import load_dotenv
 
-#: Environment variables read for the proxy (see `.env.example`).
 ENV_TYPESAFE_KEY = "TYPESAFE_API_KEY"
 ENV_TYPESAFE_BASE = "TYPESAFE_API_BASE"
 ENV_PROXY_KEY = "SEMIF_PROXY_API_KEY"
@@ -61,31 +30,22 @@ DEFAULT_RETRIES = 3
 DEFAULT_BACKOFF_SECONDS = 0.5
 KEY_PREFIX = "sk-semif-"
 
-#: Statuses the TypeSafe docs say to retry with exponential backoff.
 RETRY_STATUSES = frozenset({429, 529})
-#: Paths handled locally instead of being forwarded upstream.
+
 HEALTH_PATHS = frozenset({"/", "/health", "/healthz"})
 
-
 def generate_api_key() -> str:
-    """Return a fresh local proxy key (``sk-semif-`` + 48 hex chars)."""
+
     return KEY_PREFIX + secrets.token_hex(24)
 
-
 def mask_key(key: str | None) -> str:
-    """Render a key for logs without exposing its secret half."""
+
     if not key:
         return "(unset)"
     return key if len(key) <= 12 else f"{key[:12]}...{key[-4:]}"
 
-
 def normalize_path(path: str) -> str:
-    """Strip a leading ``/typesafe`` prefix, mirroring LiteLLM's pass-through.
 
-    ``/typesafe/v1/systemone`` -> ``/v1/systemone``; ``/v1/systemone`` is kept
-    as-is so the proxy also works when a client points straight at it.
-    Query strings are preserved.
-    """
     raw = path or "/"
     if raw == "/typesafe":
         return "/"
@@ -93,14 +53,8 @@ def normalize_path(path: str) -> str:
         raw = raw[len("/typesafe"):]
     return raw or "/"
 
-
 def upsert_env(path: Path, updates: dict[str, str]) -> dict[str, str]:
-    """Set ``KEY=VALUE`` lines in a dotenv file, preserving everything else.
 
-    Rewrites only the keys named in ``updates`` (matching a leading ``export ``)
-    and appends the rest. Creates the file and its parents when missing.
-    Returns ``updates`` for convenience.
-    """
     lines = path.read_text().splitlines() if path.exists() else []
     seen: set[str] = set()
     result: list[str] = []
@@ -120,10 +74,8 @@ def upsert_env(path: Path, updates: dict[str, str]) -> dict[str, str]:
     path.write_text("\n".join(result).rstrip("\n") + "\n")
     return updates
 
-
 @dataclass
 class Upstream:
-    """Minimal stdlib client for the TypeSafe evaluation endpoint."""
 
     base_url: str
     api_key: str
@@ -144,11 +96,7 @@ class Upstream:
             raise ValueError("Retries cannot be negative")
 
     def request(self, method: str, path: str, body: bytes = b"", content_type: str | None = None):
-        """Forward one request; return ``(status, content_type, body)``.
 
-        Retries ``429``/``529`` and transient network failures with exponential
-        backoff. Upstream error bodies are passed through unchanged.
-        """
         url = self.base_url + normalize_path(path)
         headers = {"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"}
         if content_type:
@@ -177,7 +125,6 @@ class Upstream:
                     continue
                 raise RuntimeError(f"TypeSafe request to {url} failed after {attempt + 1} attempts: {error}") from error
 
-
 def _health_payload(upstream: Upstream, proxy_key: str) -> bytes:
     return json.dumps(
         {
@@ -195,9 +142,7 @@ def _health_payload(upstream: Upstream, proxy_key: str) -> bytes:
         indent=2,
     ).encode()
 
-
 def make_handler(upstream: Upstream, proxy_key: str, auth_required: bool = True):
-    """Build the request handler class bound to one upstream and key."""
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "SemIFTypeSafeProxy/1.0"
@@ -217,8 +162,7 @@ def make_handler(upstream: Upstream, proxy_key: str, auth_required: bool = True)
             scheme, _, token = header.partition(" ")
             if scheme.lower() != "bearer" or not token:
                 return False
-            # Accept either the local proxy key or the real key, so pasting the
-            # TypeSafe key into a client still works.
+
             return any(
                 hmac.compare_digest(token, candidate)
                 for candidate in (proxy_key, upstream.api_key)
@@ -266,11 +210,10 @@ def make_handler(upstream: Upstream, proxy_key: str, auth_required: bool = True)
         def do_DELETE(self) -> None:
             self._forward()
 
-        def log_message(self, *args) -> None:  # keep the console quiet
+        def log_message(self, *args) -> None:
             pass
 
     return Handler
-
 
 def _resolve_port(value: str | None, fallback: int) -> int:
     if value is None or value == "":
@@ -278,7 +221,6 @@ def _resolve_port(value: str | None, fallback: int) -> int:
     if not re.fullmatch(r"\d+", value):
         raise ValueError("Proxy port must be an integer")
     return int(value)
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Proxy the TypeSafe (Jev) System One API with a local API key.")
@@ -352,7 +294,6 @@ def main() -> None:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
-
 
 if __name__ == "__main__":
     main()

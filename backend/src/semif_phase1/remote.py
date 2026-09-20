@@ -1,14 +1,3 @@
-"""Remote OpenAI-compatible scoring (LM Studio, Ollama, vLLM, ...).
-
-Sends the same frozen direct prompt as :mod:`semif_phase1.core` to a
-hosted ``/chat/completions`` endpoint and reads single-token option
-logprobs instead of native logits. No answer text is retained.
-
-LM Studio exposes this at ``http://localhost:1234/v1`` once a model is
-loaded and the server is started. Any server implementing the OpenAI
-chat-completions ``logprobs``/``top_logprobs`` contract works.
-"""
-
 from __future__ import annotations
 
 import json
@@ -26,7 +15,6 @@ DEFAULT_BASE_URL = "http://localhost:1234/v1"
 DEFAULT_TIMEOUT_SECONDS = 120
 DEFAULT_TOP_LOGPROBS = 20
 
-#: Environment variables read for the remote backend (see `.env.example`).
 ENV_BASE_URL = "SEMIF_REMOTE_BASE_URL"
 ENV_MODEL = "SEMIF_REMOTE_MODEL"
 ENV_API_KEY = "SEMIF_REMOTE_API_KEY"
@@ -36,14 +24,8 @@ ENV_TOP_LOGPROBS = "SEMIF_REMOTE_TOP_LOGPROBS"
 ENV_REASONING_EFFORT = "SEMIF_REMOTE_REASONING_EFFORT"
 DEFAULT_REASONING_EFFORT = "none"
 
-
 def load_dotenv(path: str | Path) -> dict:
-    """Load ``KEY=VALUE`` lines from a dotenv file into ``os.environ``.
 
-    Existing environment variables are never overridden. Supports `#`
-    comments, a leading ``export ``, and single/double-quoted values.
-    Missing files load as empty. Stdlib only.
-    """
     loaded: dict[str, str] = {}
     try:
         text = Path(path).read_text()
@@ -69,10 +51,8 @@ def load_dotenv(path: str | Path) -> dict:
             loaded[key] = value
     return loaded
 
-
 @dataclass
 class RemoteClient:
-    """Minimal ``/chat/completions`` client using only the stdlib."""
 
     base_url: str
     model: str
@@ -91,8 +71,7 @@ class RemoteClient:
             "top_logprobs": self.top_logprobs,
         }
         if self.reasoning_effort:
-            # Thinking models (e.g. Qwen3.5) would otherwise spend the single
-            # token on reasoning and return no answer logprobs.
+
             payload["reasoning_effort"] = self.reasoning_effort
         return _post_json(
             self.base_url.rstrip("/") + "/chat/completions",
@@ -100,7 +79,6 @@ class RemoteClient:
             self.api_key,
             self.timeout_seconds,
         )
-
 
 def _post_json(url: str, payload: dict, api_key: str, timeout: float) -> dict:
     body = json.dumps(payload).encode()
@@ -118,7 +96,6 @@ def _post_json(url: str, payload: dict, api_key: str, timeout: float) -> dict:
     except Exception as error:
         raise RuntimeError(f"Remote scoring request to {url} failed: {error}") from error
 
-
 def load_model(
     source: str,
     revision: str,
@@ -128,13 +105,7 @@ def load_model(
     top_logprobs: int = DEFAULT_TOP_LOGPROBS,
     reasoning_effort: str | None = DEFAULT_REASONING_EFFORT,
 ) -> tuple[RemoteClient, None, dict]:
-    """Configure a remote model; weights stay on the host server.
 
-    ``source`` is the server-side model ID (for LM Studio, the loaded
-    model name). ``revision`` is a free-form label (server build, model
-    file hash, ...) because remote servers do not expose git revisions.
-    Nothing is downloaded and no GPU is required locally.
-    """
     if not source:
         raise ValueError("Remote backend requires --model as the server-side model ID")
     if not revision:
@@ -164,7 +135,6 @@ def load_model(
     }
     return client, None, metadata
 
-
 def _candidate_token(entry: dict) -> str:
     if not isinstance(entry, dict):
         return ""
@@ -179,9 +149,8 @@ def _candidate_token(entry: dict) -> str:
             return ""
     return ""
 
-
 def extract_option_logprobs(response: dict, count: int) -> list[float]:
-    """Pull one logprob per answer letter from a chat-completion response."""
+
     letters = list(LETTERS[:count])
     try:
         choice = response["choices"][0]
@@ -212,10 +181,9 @@ def extract_option_logprobs(response: dict, count: int) -> list[float]:
         )
     return [best[letter] for letter in letters]
 
-
 def score(client: RemoteClient, tokenizer, row: dict, metadata: dict, max_tokens: int = 4096) -> dict:
-    """Score one decision through the remote server (direct mode)."""
-    _ = (tokenizer, max_tokens)  # remote servers enforce context limits
+
+    _ = (tokenizer, max_tokens)
     validate_row(row)
     started = time.perf_counter()
     messages = direct_messages(row)
@@ -241,9 +209,7 @@ def score(client: RemoteClient, tokenizer, row: dict, metadata: dict, max_tokens
         "probability_status": "conditional option score; uncalibrated as decision confidence",
     }
 
-
 class SerialPrefixScorer:
-    """Sequential remote scorer; the host server owns KV-cache reuse."""
 
     def __init__(self, model: RemoteClient, tokenizer, metadata: dict, max_tokens: int = 4096):
         self.model = model
@@ -258,11 +224,10 @@ class SerialPrefixScorer:
         self.state = row["state"]
         return result
 
-
 def score_shared(
     model: RemoteClient, tokenizer, rows: list[dict], metadata: dict, max_tokens: int = 4096
 ):
-    """Score rows sharing one exact state via sequential remote calls."""
+
     if not rows or any(row["state"] != rows[0]["state"] for row in rows[1:]):
         raise ValueError("Shared scoring requires one nonempty exact state")
     if len({row["id"] for row in rows}) != len(rows):

@@ -1,4 +1,3 @@
-"""Recompute output-blind stability reports for direct logits and reranker."""
 import argparse
 from collections import defaultdict
 import json
@@ -7,10 +6,8 @@ import statistics
 
 import evaluate
 
-
 def read(path: Path):
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-
 
 def indexed(rows):
     result = {row["id"]: row for row in rows}
@@ -18,14 +15,11 @@ def indexed(rows):
         raise ValueError("Duplicate IDs")
     return result
 
-
 def chosen(row):
     return row["option_ids"][max(range(len(row["probabilities"])), key=row["probabilities"].__getitem__)]
 
-
 def distribution(row):
     return dict(zip(row["option_ids"], row["probabilities"]))
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -95,7 +89,6 @@ def main() -> None:
         result["systems"][name] = report
     with args.output.open("x") as destination:
         destination.write(json.dumps(result, indent=2, allow_nan=False) + "\n")
-
 
 if __name__ == "__main__":
     main()

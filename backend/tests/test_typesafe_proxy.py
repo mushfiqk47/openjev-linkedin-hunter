@@ -10,7 +10,6 @@ import pytest
 from semif_phase1 import typesafe_proxy
 from semif_phase1.typesafe_proxy import Upstream, main, make_handler, normalize_path
 
-
 class _UpstreamHandler(BaseHTTPRequestHandler):
     queue: list = []
     seen: list = []
@@ -40,13 +39,11 @@ class _UpstreamHandler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
-
 @pytest.fixture(autouse=True)
 def _isolate_process_env(monkeypatch):
     for key in ("TYPESAFE_API_KEY", "TYPESAFE_API_BASE", "SEMIF_PROXY_API_KEY",
                 "SEMIF_PROXY_HOST", "SEMIF_PROXY_PORT", "SEMIF_PROXY_TIMEOUT"):
         monkeypatch.delenv(key, raising=False)
-
 
 @pytest.fixture
 def upstream_server():
@@ -59,12 +56,10 @@ def upstream_server():
     server.shutdown()
     server.server_close()
 
-
 def _start(handler) -> ThreadingHTTPServer:
     server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
-
 
 def _call(url, key=None, body=None, method="POST"):
     data = json.dumps(body).encode() if body is not None else None
@@ -79,16 +74,13 @@ def _call(url, key=None, body=None, method="POST"):
     except urllib.error.HTTPError as error:
         return error.code, json.loads(error.read() or b"null")
 
-
 SUBJECT = {"state": "Help! My payouts have been failing.", "model": "jev-latest",
            "questions": {"is_urgent": {"type": "noul", "instructions": "Urgent?"}}}
-
 
 def test_generate_api_key_shape_and_uniqueness():
     keys = {typesafe_proxy.generate_api_key() for _ in range(50)}
     assert len(keys) == 50
     assert all(key.startswith("sk-semif-") and len(key) == len("sk-semif-") + 48 for key in keys)
-
 
 def test_normalize_path_strips_typesafe_prefix():
     assert normalize_path("/typesafe/v1/systemone") == "/v1/systemone"
@@ -96,7 +88,6 @@ def test_normalize_path_strips_typesafe_prefix():
     assert normalize_path("/typesafe") == "/"
     assert normalize_path("/v1/systemone") == "/v1/systemone"
     assert normalize_path("") == "/"
-
 
 def test_upsert_env_replaces_and_preserves(tmp_path, monkeypatch):
     env = tmp_path / ".env"
@@ -119,7 +110,6 @@ def test_upsert_env_replaces_and_preserves(tmp_path, monkeypatch):
     typesafe_proxy.upsert_env(created, {"SEMIF_PROXY_API_KEY": "sk-semif-new"})
     assert created.read_text().strip() == "SEMIF_PROXY_API_KEY=sk-semif-new"
 
-
 def test_upstream_injects_real_key_and_passes_body(upstream_server):
     _UpstreamHandler.queue.append((200, {"model": "jev-1.13.0", "answers": {}}))
     upstream = Upstream(base_url=upstream_server, api_key="real-secret")
@@ -132,7 +122,6 @@ def test_upstream_injects_real_key_and_passes_body(upstream_server):
     assert sent["path"] == "/v1/systemone"
     assert json.loads(sent["body"]) == SUBJECT
 
-
 def test_upstream_retries_on_429_then_succeeds(upstream_server):
     _UpstreamHandler.queue.extend([(429, {"error": "rate limited"}), (200, {"model": "jev-latest"})])
     upstream = Upstream(base_url=upstream_server, api_key="k", retries=2, backoff_seconds=0.0,
@@ -140,7 +129,6 @@ def test_upstream_retries_on_429_then_succeeds(upstream_server):
     status, _, payload = upstream.request("POST", "/v1/systemone", b"{}", "application/json")
     assert status == 200 and json.loads(payload)["model"] == "jev-latest"
     assert len(_UpstreamHandler.seen) == 2
-
 
 def test_upstream_passes_through_terminal_error(upstream_server):
     _UpstreamHandler.queue.append((422, {"error": "invalid question type"}))
@@ -150,13 +138,11 @@ def test_upstream_passes_through_terminal_error(upstream_server):
     assert status == 422 and json.loads(payload)["error"] == "invalid question type"
     assert len(_UpstreamHandler.seen) == 1
 
-
 def test_upstream_rejects_bad_configuration():
     with pytest.raises(ValueError, match="http"):
         Upstream(base_url="nope", api_key="k")
     with pytest.raises(ValueError, match="API key"):
         Upstream(base_url="http://localhost:1", api_key="")
-
 
 def test_proxy_requires_key_and_forwards_with_real_key(upstream_server):
     reply = {"model": "jev-latest", "answers": {"is_urgent": {"noul": 0.92}}}
@@ -172,12 +158,11 @@ def test_proxy_requires_key_and_forwards_with_real_key(upstream_server):
         assert status == 200 and payload["answers"]["is_urgent"]["noul"] == 0.92
         assert _UpstreamHandler.seen[-1]["authorization"] == "Bearer real-secret"
         assert _UpstreamHandler.seen[-1]["path"] == "/v1/systemone"
-        # the real key is also accepted directly, so pasting it into a client works
+
         assert _call(url, key="real-secret", body=SUBJECT)[0] == 200
     finally:
         server.shutdown()
         server.server_close()
-
 
 def test_proxy_health_is_open_and_masks_keys(upstream_server):
     upstream = Upstream(base_url=upstream_server, api_key="real-secret-value")
@@ -193,7 +178,6 @@ def test_proxy_health_is_open_and_masks_keys(upstream_server):
         server.shutdown()
         server.server_close()
 
-
 def test_proxy_can_run_without_auth(upstream_server):
     _UpstreamHandler.queue.append((200, {"model": "jev-latest"}))
     upstream = Upstream(base_url=upstream_server, api_key="real-secret")
@@ -206,7 +190,6 @@ def test_proxy_can_run_without_auth(upstream_server):
         server.shutdown()
         server.server_close()
 
-
 def test_generate_key_writes_env_and_exits(tmp_path, monkeypatch, capsys):
     env = tmp_path / ".env"
     env.write_text("TYPESAFE_API_KEY=real-secret\n")
@@ -215,7 +198,6 @@ def test_generate_key_writes_env_and_exits(tmp_path, monkeypatch, capsys):
     key = [line for line in env.read_text().splitlines() if line.startswith("SEMIF_PROXY_API_KEY=")][0]
     assert "TYPESAFE_API_KEY=real-secret" in env.read_text()
     assert key.removeprefix("SEMIF_PROXY_API_KEY=") in capsys.readouterr().out
-
 
 def test_missing_typesafe_key_fails_loudly(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)

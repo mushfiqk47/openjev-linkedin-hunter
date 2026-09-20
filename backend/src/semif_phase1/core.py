@@ -1,5 +1,3 @@
-"""Shared input validation, prompts, model loading, and numeric helpers."""
-
 from __future__ import annotations
 
 import hashlib
@@ -13,7 +11,6 @@ DIRECT_SYSTEM = (
     "Apply the supplied criterion to the supplied evidence. Choose exactly one listed option. "
     "Respond with only its uppercase letter, with no explanation or reasoning."
 )
-
 
 def validate_row(row: dict, *, min_options: int = 2, max_options: int = len(LETTERS)) -> None:
     required = {"id", "state", "question", "options"}
@@ -39,7 +36,6 @@ def validate_row(row: dict, *, min_options: int = 2, max_options: int = len(LETT
     if len(ids) != len(set(ids)):
         raise ValueError("Option IDs must be unique")
 
-
 def direct_messages(row: dict) -> list[dict]:
     validate_row(row)
     payload = {
@@ -55,7 +51,6 @@ def direct_messages(row: dict) -> list[dict]:
         {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
     ]
 
-
 def softmax(values: list[float]) -> list[float]:
     if len(values) < 2 or any(not math.isfinite(value) for value in values):
         raise ValueError("Need at least two finite scores")
@@ -64,13 +59,11 @@ def softmax(values: list[float]) -> list[float]:
     total = sum(weights)
     return [weight / total for weight in weights]
 
-
 def digest(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
-
 def load_causal_model(source: str, revision: str):
-    """Load one pinned causal model on the sole visible CUDA device."""
+
     import torch
     import transformers
 

@@ -1,5 +1,3 @@
-"""Rebuild the frozen 102-row TypeSafe subset from verified public case payloads."""
-
 from __future__ import annotations
 
 import argparse
@@ -7,7 +5,6 @@ import hashlib
 import json
 import math
 from pathlib import Path
-
 
 def parse_payload(path: Path):
     text = path.read_text().strip()
@@ -19,14 +16,12 @@ def parse_payload(path: Path):
         raise ValueError(f"Unexpected trailing content in {path}")
     return payload
 
-
 def vector(raw, keys):
     values = [float(raw.get(key, 0)) for key in keys]
     if any(not math.isfinite(value) or value < 0 for value in values) or sum(values) <= 0:
         raise ValueError("Invalid probability vector")
     total = sum(values)
     return [value / total for value in values]
-
 
 def reference_vector(answer, keys):
     if answer.get("probabilities"):
@@ -37,13 +32,11 @@ def reference_vector(answer, keys):
         raise ValueError("Reference value is outside the declared options")
     return [float(candidate == key) for candidate in keys]
 
-
 def published_vector(answer, primitive, keys):
     if primitive == "noul":
         probability = float(answer["noul"])
         return [probability if key == "true" else 1 - probability for key in keys]
     return vector(answer["probabilities"], keys)
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -64,7 +57,7 @@ def main() -> None:
         upstream = item["upstream"]
         workflow = upstream["workflow"]
         payload = payloads[workflow]
-        # The frozen manifest hashes the human-readable parsed snapshot.
+
         parsed_hash = hashlib.sha256(json.dumps(payload, indent=2).encode()).hexdigest()
         if parsed_hash != upstream["snapshot_sha256"]:
             raise ValueError(f"Parsed {workflow} snapshot hash changed")
@@ -131,7 +124,6 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows))
     print("wrote 102 rows")
-
 
 if __name__ == "__main__":
     main()

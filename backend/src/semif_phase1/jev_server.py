@@ -1,26 +1,3 @@
-"""Jev choice-contract server backed by a hosted model.
-
-Answers the TypeSafe-shaped choice request that a Jev client sends
-(``{model, state, questions}`` in, ``{model, answers, usage}`` out) through an
-OpenAI-compatible server (LM Studio, Ollama, vLLM), so a Jev contract consumer
-can run without the hosted API and without an API key. Every question's criteria
-become SemIf options:
-
-- 2-16 criteria: one single-token logprob readout over lettered options
-  (``A``-``P``), exactly like :mod:`semif_phase1.remote`.
-- More criteria (large element tables): one yes/no relevance readout per
-  criterion, normalized across criteria.
-- Exactly one criterion: the only candidate is answered with probability 1.0 and
-  the model is not asked to rank a single option, so no call is spent on it.
-
-The choice is always the probability argmax and probabilities sum to one, which
-is what the contract's client-side validation requires. Confidence is the top
-probability: a ranking signal, not calibrated confidence.
-
-Both ``POST /v1/systemone`` (TypeSafe's path) and ``POST /v1/choices`` are
-served. Stdlib-only HTTP, matching the ``remote`` backend.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -37,12 +14,11 @@ BINARY_PROMPT_VERSION = "jev-choices-remote-binary-v1"
 SINGLE_PROMPT_VERSION = "jev-choices-single-candidate-v1"
 DEFAULT_PORT = 8090
 PATHS = frozenset({"/v1/systemone", "/v1/choices"})
-MAX_DIRECT_OPTIONS = len(LETTERS)  # 16 single-token letter slots
+MAX_DIRECT_OPTIONS = len(LETTERS)
 BINARY_SYSTEM = "Answer the question about the candidate with only the single word yes or no."
 
-
 def render_criterion(value) -> str:
-    """Render a criterion (description string or target dict) as option text."""
+
     if isinstance(value, str):
         return value
     if isinstance(value, dict):
@@ -50,9 +26,8 @@ def render_criterion(value) -> str:
                          if isinstance(item, (str, int, float, bool)))
     return json.dumps(value, ensure_ascii=False)
 
-
 def question_text(instructions: dict, question_id: str) -> str:
-    """Use the request's own instruction text as the criterion, if it has any."""
+
     if isinstance(instructions, dict):
         for key in ("question", "goal"):
             value = instructions.get(key)
@@ -60,9 +35,8 @@ def question_text(instructions: dict, question_id: str) -> str:
                 return value.strip()
     return question_id
 
-
 def parse_request(body: dict) -> tuple[str | None, dict, dict]:
-    """Validate a Jev choice request; return ``(model, state, questions)``."""
+
     if not isinstance(body, dict):
         raise ValueError("Request body must be a JSON object")
     state = body.get("state")
@@ -78,9 +52,8 @@ def parse_request(body: dict) -> tuple[str | None, dict, dict]:
     model = body.get("model")
     return (model if isinstance(model, str) and model else None, state, questions)
 
-
 def build_row(question_id: str, state, question: dict) -> tuple[dict, list[str]]:
-    """Pack one Jev question into a SemIf decision row; return row and criterion keys."""
+
     criteria = question["criteria"]
     instructions = question.get("instructions", {})
     keys = list(criteria.keys())
@@ -90,14 +63,12 @@ def build_row(question_id: str, state, question: dict) -> tuple[dict, list[str]]
         "question": question_text(instructions, str(question_id)),
         "options": [{"id": str(key), "description": render_criterion(criteria[key])} for key in keys],
     }
-    # A target head may offer a single candidate; a large element table may exceed
-    # the 16 lettered slots, which the binary relevance readout covers instead.
+
     validate_row(row, min_options=1, max_options=max(len(keys), MAX_DIRECT_OPTIONS))
     return row, [str(key) for key in keys]
 
-
 def answer_single(keys: list[str]) -> dict:
-    """Answer a single-candidate question without spending a model call."""
+
     return {
         "choice": keys[0],
         "probabilities": {keys[0]: 1.0},
@@ -106,9 +77,8 @@ def answer_single(keys: list[str]) -> dict:
         "model_calls": 0,
     }
 
-
 def answer_direct(client, row: dict, keys: list[str], model: str | None) -> dict:
-    """One lettered-option logprob readout over every criterion of the question."""
+
     messages = direct_messages(row)
     prompt_hash = digest(json.dumps(messages, ensure_ascii=False))
     response = client.chat(messages, model=model)
@@ -123,9 +93,8 @@ def answer_direct(client, row: dict, keys: list[str], model: str | None) -> dict
         "model_calls": 1,
     }
 
-
 def extract_yes_no(response: dict) -> float:
-    """Return yes-minus-no log-odds from a binary readout response."""
+
     try:
         content = response["choices"][0]["logprobs"]["content"][0]
     except (KeyError, IndexError, TypeError) as error:
@@ -143,7 +112,6 @@ def extract_yes_no(response: dict) -> float:
         raise ValueError("Remote top_logprobs lacks yes/no tokens for binary relevance")
     return best["YES"] - best["NO"]
 
-
 def binary_messages(row: dict, description: str) -> list[dict]:
     return [
         {"role": "system", "content": BINARY_SYSTEM},
@@ -154,9 +122,8 @@ def binary_messages(row: dict, description: str) -> list[dict]:
         }, ensure_ascii=False)},
     ]
 
-
 def answer_binary(client, row: dict, keys: list[str], model: str | None) -> dict:
-    """One yes/no relevance call per criterion, for questions with many criteria."""
+
     odds = [extract_yes_no(client.chat(binary_messages(row, option["description"]), model=model))
             for option in row["options"]]
     probabilities = softmax(odds)
@@ -169,9 +136,8 @@ def answer_binary(client, row: dict, keys: list[str], model: str | None) -> dict
         "model_calls": len(keys),
     }
 
-
 def serve_request(client, metadata: dict, body: dict) -> dict:
-    """Answer every question in a Jev choice request."""
+
     started = time.perf_counter()
     model, state, questions = parse_request(body)
     answers, calls = {}, 0
@@ -194,9 +160,7 @@ def serve_request(client, metadata: dict, body: dict) -> dict:
         },
     }
 
-
 def make_handler(client, metadata: dict):
-    """Build the request handler class bound to one hosted-model client."""
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "SemIfJevChoices/1.0"
@@ -226,7 +190,7 @@ def make_handler(client, metadata: dict):
             except (ValueError, json.JSONDecodeError) as error:
                 self._send(400, json.dumps({"error": str(error)}).encode(), "application/json")
                 return
-            except Exception as error:  # host unreachable, bad logprobs, ...
+            except Exception as error:
                 self._send(502, json.dumps({"error": str(error)}).encode(), "application/json")
                 return
             self._send(200, json.dumps(result, allow_nan=False).encode(), "application/json")
@@ -236,12 +200,8 @@ def make_handler(client, metadata: dict):
 
     return Handler
 
-
 def load_configuration(env_file: Path | None = None):
-    """Build the hosted-model client from ``SEMIF_REMOTE_*`` settings.
 
-    ``env_file`` is optional so a launcher can supply its own environment first.
-    """
     if env_file is not None:
         remote_backend.load_dotenv(env_file)
     import os
@@ -266,7 +226,6 @@ def load_configuration(env_file: Path | None = None):
     )
     return client, metadata
 
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Serve the Jev choice contract from a hosted model.")
     parser.add_argument("--host", default="127.0.0.1")
@@ -288,7 +247,6 @@ def main() -> None:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
-
 
 if __name__ == "__main__":
     main()

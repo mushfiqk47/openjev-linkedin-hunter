@@ -7,7 +7,6 @@ import pytest
 
 from semif_phase1 import remote, server
 
-
 class FakeClient(remote.RemoteClient):
     def __init__(self):
         super().__init__(base_url="http://localhost:1234/v1", model="test-model")
@@ -18,7 +17,6 @@ class FakeClient(remote.RemoteClient):
             "top_logprobs": [{"token": "A", "logprob": -0.2},
                              {"token": "B", "logprob": -1.7}],
         }]}}], "usage": {"prompt_tokens": 10, "completion_tokens": 1}}
-
 
 @pytest.fixture()
 def app():
@@ -32,7 +30,6 @@ def app():
     yield f"http://127.0.0.1:{httpd.server_port}"
     httpd.shutdown()
 
-
 def post(url, payload):
     request = urllib.request.Request(
         url + "/api/score", data=json.dumps(payload).encode(),
@@ -43,12 +40,10 @@ def post(url, payload):
     except urllib.error.HTTPError as error:
         return error.code, json.loads(error.read())
 
-
 def test_page_has_no_external_dependencies():
     assert 'id="state"' in server.PAGE and 'id="run"' in server.PAGE
     for marker in ("https://", 'src="http', 'href="http'):
         assert marker not in server.PAGE
-
 
 def test_score_endpoint_returns_distribution(app):
     status, data = post(app, {"state": "Evidence", "question": "Which?",
@@ -58,12 +53,10 @@ def test_score_endpoint_returns_distribution(app):
     assert sum(data["probabilities"]) == pytest.approx(1.0)
     assert "uncalibrated" in data["probability_status"]
 
-
 def test_score_endpoint_rejects_bad_input(app):
     status, data = post(app, {"state": "", "question": "Which?", "options": ["only-one"]})
     assert status == 400
     assert "error" in data
-
 
 def test_normalize_options_accepts_objects_and_strings():
     options = server.normalize_options(["Plain", {"id": "x", "description": "Why"}])

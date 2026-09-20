@@ -1,5 +1,3 @@
-"""Compare shared typed readout with compact ordered-array generation."""
-
 from __future__ import annotations
 
 import argparse
@@ -12,7 +10,6 @@ from pathlib import Path
 from semif_phase1.core import load_causal_model
 from semif_phase1.shared import score_shared
 
-
 class TimelineStreamer:
     def __init__(self, tokenizer, started: float):
         self.tokenizer = tokenizer
@@ -21,7 +18,7 @@ class TimelineStreamer:
         self.events = []
 
     def put(self, value):
-        if self.initial:  # generate() first sends the input IDs
+        if self.initial:
             self.initial = False
             return
         elapsed = time.perf_counter() - self.started
@@ -36,7 +33,6 @@ class TimelineStreamer:
 
     def end(self):
         pass
-
 
 def compact_messages(state: str, rows: list[dict]) -> list[dict]:
     request = {
@@ -55,7 +51,6 @@ def compact_messages(state: str, rows: list[dict]) -> list[dict]:
         },
         {"role": "user", "content": json.dumps(request, ensure_ascii=False)},
     ]
-
 
 def run_generation(model, tokenizer, state: str, rows: list[dict], max_new_tokens: int) -> dict:
     import torch
@@ -106,7 +101,6 @@ def run_generation(model, tokenizer, state: str, rows: list[dict], max_new_token
         "timeline": streamer.events,
     }
 
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True)
@@ -125,7 +119,6 @@ def main() -> None:
     model, tokenizer, metadata = load_causal_model(args.model, args.revision)
     import torch
 
-    # Warm both paths; warmup is excluded from every reported duration.
     score_shared(model, tokenizer, rows, metadata)
     warmup = run_generation(model, tokenizer, rows[0]["state"], rows[:1], 16)
     if not warmup["timeline"]:
@@ -199,7 +192,6 @@ def main() -> None:
             }
         )
     )
-
 
 if __name__ == "__main__":
     main()

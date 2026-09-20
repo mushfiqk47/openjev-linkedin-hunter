@@ -1,5 +1,3 @@
-"""Recompute the published TypeSafe-subset and Every metrics."""
-
 from __future__ import annotations
 
 import argparse
@@ -9,10 +7,8 @@ import math
 from pathlib import Path
 import statistics
 
-
 def read(path):
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
-
 
 def prediction_map(rows):
     result = {}
@@ -33,13 +29,11 @@ def prediction_map(rows):
         result[row["id"]] = row
     return result
 
-
 def aligned_distribution(row, prediction):
     option_ids = [option["id"] for option in row["options"]]
     if prediction["option_ids"] != option_ids:
         raise ValueError(f"Option IDs/order differ for {row['id']}")
     return prediction["probabilities"]
-
 
 def type_safe(gold, direct, reranker):
     systems = {"direct": prediction_map(direct), "reranker": prediction_map(reranker)}
@@ -78,12 +72,10 @@ def type_safe(gold, direct, reranker):
         }
     return result
 
-
 def yes_probability(row, predictions):
     prediction = predictions[row["id"]]
     aligned_distribution(row, prediction)
     return prediction["probabilities"][prediction["option_ids"].index("yes")]
-
 
 def hard_label(rows, predictions):
     correct = 0
@@ -91,7 +83,6 @@ def hard_label(rows, predictions):
         probability = yes_probability(row, predictions)
         correct += (probability >= 0.5) == (row["options"][row["label"]]["id"] == "yes")
     return {"rows": len(rows), "correct": correct, "accuracy": correct / len(rows)}
-
 
 def retrieval(rows, predictions):
     queries = defaultdict(list)
@@ -117,7 +108,6 @@ def retrieval(rows, predictions):
         "mrr": statistics.mean(reciprocal_ranks),
     }
 
-
 def firewall_gate(signals):
     if (
         (signals["destructive"] > 0.72 and signals["reversible"] < 0.35)
@@ -133,7 +123,6 @@ def firewall_gate(signals):
         return "confirm"
     return "allow"
 
-
 def firewall(rows, predictions, actions):
     by_item = defaultdict(dict)
     for row in rows:
@@ -146,7 +135,6 @@ def firewall(rows, predictions, actions):
     decisions = {item: firewall_gate(signals) for item, signals in by_item.items()}
     correct = sum(decisions[item] == action for item, action in expected.items())
     return {"rows": len(rows), "actions": len(expected), "correct": correct, "accuracy": correct / len(expected)}
-
 
 def every(gold, inference, direct, reranker, actions):
     systems = {"direct": prediction_map(direct), "reranker": prediction_map(reranker)}
@@ -169,7 +157,6 @@ def every(gold, inference, direct, reranker, actions):
             "action-firewall": firewall(firewall_rows, predictions, actions),
         }
     return result
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -196,7 +183,6 @@ def main() -> None:
             json.loads(args.firewall_actions.read_text()),
         )
     print(json.dumps(report, indent=2))
-
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,3 @@
-"""Reproduce fresh versus parallel shared-state scoring on the owned 37x21 fixture."""
-
 from __future__ import annotations
 
 import argparse
@@ -14,7 +12,6 @@ from semif_phase1.core import load_causal_model
 from semif_phase1.direct import score
 from semif_phase1.serial import SerialPrefixScorer
 from semif_phase1.shared import score_shared
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -103,7 +100,6 @@ def main() -> None:
         )
     )
     print(json.dumps(report["results"]))
-
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,3 @@
-"""Build the frozen output-blind stability variants from the owned fixture."""
 import argparse
 import hashlib
 import json
@@ -10,10 +9,8 @@ IRRELEVANT = (
     "This note has no relationship to the primary record or criterion."
 )
 
-
 def variant_id(base: str, kind: str) -> str:
     return hashlib.sha256(f"{base}/{kind}".encode()).hexdigest()[:20]
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -67,7 +64,6 @@ def main() -> None:
         "frozen_before_outputs": True,
         "missing_evidence": "Use the 36 existing missing variants in the source fixture.",
     }, indent=2) + "\n")
-
 
 if __name__ == "__main__":
     main()

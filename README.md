@@ -1,230 +1,282 @@
-# 🎯 OpenJev · Autonomous LinkedIn Job Hunter & Decision Engine
+# ⚡ Jev AI Platform: Autonomous LinkedIn Job Hunter & Network Outreach Engine
 
-An end-to-end autonomous agent platform combining **SemIf** (TypeSafe Jev baseline for sub-second deterministic decision-making) with an **Autonomous LinkedIn Browser Agent**, candidate CV alignment, and an **Analogue-inspired Web Dashboard & Agent Launcher**.
+An end-to-end autonomous agentic system powered by **SemIf Phase 1** (sub-millisecond semantic decision engine) and Chrome DevTools Protocol (CDP) browser automation.
 
----
-
-## 🌟 Overview
-
-This repository houses a unified ecosystem:
-
-1. **SemIf Decision Engine (`backend/`)**: High-performance semantic decision engine ("semantic `if`"). Instead of generating natural language or JSON and parsing text, SemIf extracts decision probabilities **directly from native model logprobs** in a single forward pass (<0.3s) via LM Studio (`qwen3.5-4b`) or native PyTorch. Zero hallucinations, zero parsing errors, zero timeouts.
-2. **Autonomous LinkedIn Job Hunter Agent (`linkedin_hunter/`)**: Connects to the user's real browser session via Chrome DevTools Protocol (CDP port 9222), navigates LinkedIn, evaluates opportunities against the candidate's CV ([`Mushfiq_Kabir_CV.json`](Mushfiq_Kabir_CV.json)) with SemIf, auto-rotates search queries, deduplicates cards instantly, and automatically transitions to scrolling the candidate's LinkedIn News Feed until target match quotas are satisfied.
-3. **Interactive CLI Assistant (`agent/main.py`, `assistant.sh`)**: Clean terminal interface to trigger hunting, inspect reports, login to LinkedIn, and launch the dashboard.
-4. **Analogue Web Dashboard & Agent Launcher (`linkedin_hunter/web.py`)**: Monochromatic UI (pure black `#000000`, tight negative tracking, 18px radius cards, 9999px pills) with an interactive agent launcher, live streaming terminal console with graceful stop capability, and a full Markdown report viewer.
+The platform unifies three core subsystems:
+1. **Autonomous LinkedIn Job Hunter (`linkedin_hunter/`)**: Intelligent search across job listings and newsfeed hiring posts, 4-axis qualification scoring, and automated reporting.
+2. **Autonomous LinkedIn Network Outreach Agent (`linkedin_outreach/`)**: Incremental delta-sync pipeline that discovers newly added 1st-degree connections, evaluates persona relevance, verifies message history, and dispatches personalized outreach.
+3. **SemIf Phase 1 Decision Backend (`backend/`)**: Sub-millisecond logprob-based classification server and OpenAI-compatible proxy (`port 8090` / `8080`) that replaces slow, non-deterministic generative LLM calls with exact decision boundaries.
 
 ---
 
-## 📐 Architecture & Key Components
+## 🏗 System Architecture
 
+```mermaid
+flowchart TD
+    subgraph Client ["Client & Interaction Layer"]
+        CLI["assistant.sh / agent.main<br/>(Interactive Terminal CLI)"]
+    end
+
+    subgraph Agents ["Autonomous Agent Subsystems"]
+        HUNTER["LinkedIn Hunter Agent<br/>(linkedin_hunter/agent.py)"]
+        OUTREACH["LinkedIn Outreach Agent<br/>(linkedin_outreach/agent.py)"]
+    end
+
+    subgraph Decision ["SemIf Phase 1 Decision Core"]
+        SEMIF_CORE["SemIf Evaluator<br/>(Logprob Token Readouts)"]
+        LM_STUDIO["Local LLM Server<br/>(LM Studio / MLX @ port 1234)"]
+    end
+
+    subgraph Browser ["Browser Automation Layer"]
+        CDP["Chrome DevTools Protocol<br/>(Remote Debugging @ port 9222)"]
+        BROWSER_INST["Active Authenticated Browser<br/>(Google Chrome / Chromium)"]
+    end
+
+    subgraph Persistence ["Persistent Storage Layer"]
+        JOBS_DB["Job Storage<br/>(output/matched_jobs.json & .md)"]
+        REGISTRY["Network Registry<br/>(connections_registry.json)"]
+        LEDGER["Immutable Outreach Ledger<br/>(data/Complete.md)"]
+    end
+
+    CLI --> HUNTER
+    CLI --> OUTREACH
+
+    HUNTER --> CDP
+    OUTREACH --> CDP
+    CDP --> BROWSER_INST
+
+    HUNTER --> SEMIF_CORE
+    OUTREACH --> SEMIF_CORE
+    SEMIF_CORE --> LM_STUDIO
+
+    HUNTER --> JOBS_DB
+    OUTREACH --> REGISTRY
+    OUTREACH --> LEDGER
 ```
+
+---
+
+## 📁 Repository Structure
+
+```text
 jev-api/
-├── agent/                         # Autonomous Assistant & CLI
-│   └── main.py                    # Unified interactive CLI entrypoint
-├── backend/                       # SemIf (OpenJev) Decision Engine
-│   ├── src/semif_phase1/
-│   │   ├── remote.py              # Logprob extractor for LM Studio / vLLM / Ollama
-│   │   ├── direct.py              # Native PyTorch CUDA inference engine
-│   │   ├── jev_server.py          # TypeSafe Jev API drop-in server (:8090)
-│   │   ├── server.py              # SemIf interactive test UI (:8080)
-│   │   └── typesafe_proxy.py      # TypeSafe reverse proxy with client auth
-│   └── tests/                     # Test suite for SemIf decision scoring
-├── linkedin_hunter/               # Autonomous LinkedIn Browser Agent
-│   ├── browser.py                 # Playwright CDP automation & feed scraper (extract-first, jittered pacing)
-│   ├── hunt_core.py               # Deep hunting module: single run_hunt() seam for CLI + Web
-│   ├── evaluator.py               # Calibrated SemIf evaluator (BM25 prescreen, factor breakdown)
-│   ├── hunter.py                  # Thin CLI adapter over hunt_core (argparse → HuntParams)
-│   ├── storage.py                 # JD-hash dedup, enriched reports (Top 3, priorities, hooks)
-│   ├── config.py                  # Queries, filters, thresholds, skill vocabulary, timing
-│   ├── cv_loader.py               # CV JSON → prompt profile
-│   ├── login.py                   # One-time LinkedIn session login helper
-│   ├── web.py                     # Analogue Web Dashboard & UI Agent Launcher (:8085)
-│   ├── seen_jobs.json             # Persistent deduplication database (IDs, signatures, JD hashes)
-│   └── output/
-│       ├── jobs_report.md         # Generated markdown report with recruiter links
-│       ├── jobs.csv               # CSV export of matched opportunities
-│       └── matched_jobs.json      # Structured JSON records
-├── Mushfiq_Kabir_CV.json          # Candidate profile & design qualifications
-├── assistant.sh                   # Unified executable launcher script
-├── HOW_TO_RUN.md                  # SemIf backend guide
-└── README.md                      # Project documentation
+├── assistant.sh                      # Universal interactive CLI launcher
+├── Mushfiq_Kabir_CV.json             # Structured resume & skills profile
+├── agent/                            # Unified CLI assistant module
+│   ├── __init__.py
+│   └── main.py                       # Interactive multi-agent menu interface
+├── backend/                          # SemIf Phase 1 Semantic Decision Core
+│   ├── pyproject.toml                # Package configuration (semif-phase1)
+│   ├── src/semif_phase1/             # Core decision engine & servers
+│   │   ├── cli.py                    # Direct CLI scoring tool
+│   │   ├── core.py                   # Mathematical logprob decision engine
+│   │   ├── direct.py                 # Fast direct readout pipeline
+│   │   ├── jev_server.py             # OpenAI-compatible choice server (port 8090)
+│   │   ├── reranker.py               # Candidate cross-entropy reranker
+│   │   ├── server.py                 # Interactive test UI (port 8080)
+│   │   └── typesafe_proxy.py         # Schema-validated logprob proxy
+│   ├── tests/                        # Backend test suite (53 tests)
+│   └── benchmarks/                   # Model performance & perturbation benchmarks
+├── linkedin_hunter/                  # Autonomous Job Hunter Subsystem
+│   ├── agent.py                      # Unified Hunter Agent CLI
+│   ├── browser.py                    # CDP browser controller & extraction
+│   ├── config.py                     # Hunter environment variable parser
+│   ├── cv_loader.py                  # Resume profile parser
+│   ├── evaluator.py                  # Job & candidate fit scoring engine
+│   ├── hunt_core.py                  # Decoupled hunting state machine
+│   ├── hunter.py                     # Search & feed execution entrypoint
+│   ├── judgments.py                  # 4-axis weighted scoring rubrics
+│   ├── storage.py                    # JSON, Markdown, and SQLite persistence
+│   ├── triage.py                     # Post-match next actions & opener generator
+│   ├── output/                       # Output artifacts (matched_jobs.json, jobs_report.md)
+│   └── tests/                        # Hunter test suite (15 tests)
+├── linkedin_outreach/                # Autonomous Connection Outreach Subsystem
+│   ├── agent.py                      # Unified Outreach Agent CLI
+│   ├── data/
+│   │   ├── Complete.md               # Append-only ledger of messaged connections
+│   │   ├── connections_registry.json # Fast O(1) delta-sync state registry
+│   │   └── message.py                # Personalized message templates
+│   ├── outreach/
+│   │   ├── browser.py                # Playwright CDP automation runner
+│   │   ├── config.py                 # Outreach configuration parser
+│   │   ├── core.py                   # Runner abstraction
+│   │   ├── dispatch.py               # Message sender & thread detection
+│   │   ├── evaluator.py              # Candidate relevance scoring (BM25 + SemIf)
+│   │   ├── harvest.py                # Connection link extraction scripts
+│   │   ├── ledger.py                 # Append-only markdown tracker
+│   │   ├── messaging.py              # Dynamic template formatter
+│   │   ├── names.py                  # Name parsing and normalization
+│   │   ├── pipeline.py               # End-to-end sync & send pipeline
+│   │   ├── progress.py               # Pacing and daily budget tracker
+│   │   ├── registry.py               # Fast JSON registry manager
+│   │   ├── report.py                 # Terminal status reporting
+│   │   └── sync.py                   # Incremental network synchronizer
+│   └── tests/                        # Outreach test suite (60 tests)
+└── linkedin_connections_SMS -> linkedin_outreach  # Backwards compatibility symlink
 ```
-
----
-
-## ⚡ Key Capabilities
-
-### 1. Zero-Hallucination Decision Scoring (SemIf)
-- **Sub-300ms Forward Pass:** Evaluates fit by calculating native token logits on LM Studio (`qwen3.5-4b`) with `reasoning_effort="none"`.
-- **BM25 Prescreen (zero LLM cost):** Disqualified titles and no-design-signal posts filter to `SKIP` before any model call.
-- **Calibrated Scores:** Raw logprob percentages are monotonically compressed (cap 94) to counter instruct-model overconfidence; `raw_score` is preserved and `low_margin` flags borderline cases for manual review.
-- **Factor Breakdown + Real Gaps:** Each evaluation returns `role/tools/level/domain` fits, JD keywords extracted against a skill vocabulary, matched vs missing skills, employment type, and a cover-letter hook.
-- **CV Profile Alignment:** Compares candidate skills, experience level, tools (Figma, Design Systems), and dealbreakers against job descriptions and feed post content.
-
-### 2. Autonomous LinkedIn Hunter
-- **CDP Session Attachment:** Connects directly to your running browser (Brave or Chrome) via port 9222. Preserves your active session cookies, bypassing Cloudflare, CAPTCHAs, and 2FA authwalls.
-- **Dual Hunting Modes:**
-  1. **Search with Dynamic Feed Fallback:** Evaluates top search pages across rotated queries (`UI/UX Designer`, `Product Designer`, `Figma Designer`). When search results yield fewer than the target quota, the agent smoothly transitions to your LinkedIn News Feed and scrolls continuously until the goal is satisfied.
-  2. **Direct Feed Scan (`--feed-only`):** Navigates directly to `https://www.linkedin.com/feed/` to discover organic hiring posts from your network.
-- **Multi-Target Feed Scroller:** Targets `<main id="workspace">` / `.scaffold-layout__main` with `PageDown` key events, scrolling reliably across modern dynamic LinkedIn layouts.
-- **Text Expansion (`… more`):** Automatically clicks collapsed `… more` buttons on feed updates so complete job descriptions, emails, and criteria are exposed to SemIf.
-- **Instant Persistent Deduplication:** ID + `{title} @@ {company}` signature + JD-body hash in `seen_jobs.json` avoids re-evaluating previously seen postings (including identical JDs reposted under different posters, merged as aliases).
-- **Easy Apply Filter:** Optional `f_AL=true` + recent-first sorting (`--easy-apply` / dashboard checkbox).
-- **Extract-First Scraping:** Card metadata is snapshotted via a single JS pass before visiting details — no detached-element failures; role-based waits replace fixed sleeps.
-- **Hiring Lead Inspection:** Automatically identifies hiring managers / recruiters (`/in/<username>`) and company profiles (`/company/<name>`).
-- **One Hunting Core:** `hunt_core.run_hunt()` is the single seam behind both CLI and Web (query rotation, caps, feed fallback); both entrypoints are thin adapters, and fakes make it testable without LM Studio or Playwright.
-
-### 3. Analogue Web Dashboard (`http://127.0.0.1:8085`)
-- **Interactive Agent Controls:** Full form controls for query, recency, work type, target matches, query rotation, profile inspection, feed fallback, Easy Apply, and fit criteria.
-- **Direct Agent Triggers:** Dedicated `▶ Search Jobs` and `📰 Scan Feed` buttons.
-- **Live Terminal Console:** Real-time auto-scrolling terminal log with color-coded severity tags (`[INFO]`, `[MATCH]`, `[WARNING]`, `[SUCCESS]`).
-- **Graceful Stop Button:** Halts browser navigation safely at any point (`■ Stop Agent`).
-- **Segmented Report Viewer:**
-  - **Cards View:** Interactive cards with match percentages, priority/employment-type/deadline tags, factor breakdowns, JD keywords to mirror in your resume, gaps, and copyable cover openers.
-  - **Full Report (.md View):** `Top 3 Apply Now` + summary table + detailed breakdowns + separate Network Leads section.
-  - **Raw Markdown View:** Monospaced view with one-click clipboard copy and `.md` / `.csv` export links.
 
 ---
 
 ## 🛠 Prerequisites
 
-1. **Linux / macOS / Windows (WSL2)**
-2. **Python 3.11+**
-3. **Local LM Studio:**
-   - Base URL: `http://localhost:1234/v1`
-   - Model: `qwen3.5-4b` (or any OpenAI-compatible endpoint with logprobs)
-4. **Brave Browser or Google Chrome** started with remote debugging:
+1. **Operating System**: Linux, macOS, or Windows (WSL2).
+2. **Python**: Python 3.10+ (virtual environment recommended).
+3. **Local LLM Server (LM Studio / MLX / vLLM)**:
+   - Must expose an OpenAI-compatible API at `http://localhost:1234/v1`.
+   - Default model: `qwen3.5-4b` (or any model supporting logprobs).
+4. **Active Google Chrome or Chromium Browser**:
+   - Started with remote debugging or active DevTools:
    ```bash
-   # Launch Brave with remote debugging on port 9222:
-   brave-browser --remote-debugging-port=9222 &
-
-   # OR Google Chrome:
    google-chrome --remote-debugging-port=9222 &
    ```
 
 ---
 
-## 🚀 How to Run
+## 🚀 Quick Start
 
-### Method 1: Launch the Analogue Web Dashboard (Recommended)
+### 1. Launch Universal Terminal Assistant
 
-Start the web dashboard server:
-```bash
-./linkedin_hunter/.venv/bin/python -m linkedin_hunter.web
-```
-Open **`http://127.0.0.1:8085`** in your browser:
-- Click **▶ Search Jobs** to search listings with automatic News Feed fallback.
-- Click **📰 Scan Feed** to scan your LinkedIn News Feed directly for hiring opportunities.
-- Monitor live evaluations and SemIf fit scores in the Activity Terminal.
+The fastest way to access all agent operations:
 
----
-
-### Method 2: Interactive Terminal CLI (`assistant.sh`)
-
-Launch the interactive terminal assistant:
 ```bash
 ./assistant.sh
 ```
-Available options:
-- `1. 🔍 Hunt LinkedIn Jobs (Search + Feed Fallback)`: Search job postings and seamlessly fall back to feed if under target.
-- `2. 📰 Scan LinkedIn Feed Directly (Hiring Posts)`: Scan your LinkedIn News Feed directly for hiring leads.
-- `3. 📄 View Matched Jobs Report (.md)`: Print the latest formatted report in the terminal.
-- `4. 🔑 Login to LinkedIn (Save Browser Session)`: Save cookies to persistent session profile.
-- `5. 🌐 Launch Live Web Dashboard (http://127.0.0.1:8085)`: Start the web UI.
-- `0. 🚪 Exit`: Exit assistant.
 
----
-
-### Method 3: CLI Job Hunter (`hunter.py`)
-
-Run the browser hunter with custom parameters:
-```bash
-# Search jobs with automatic Feed fallback until 10 matches are found:
-./linkedin_hunter/.venv/bin/python -m linkedin_hunter.hunter \
-  --query "UI/UX Designer" \
-  --min-matches 10 \
-  --recency week \
-  --work-type all
-
-# Scan LinkedIn Feed directly for hiring leads:
-./linkedin_hunter/.venv/bin/python -m linkedin_hunter.hunter \
-  --feed-only \
-  --min-matches 10
+This launches the interactive multi-agent control console:
+```text
+===============================================================
+       🎯 Mushfiq's Autonomous LinkedIn Job Hunter Agent
+===============================================================
+  1. 🔍 Hunt LinkedIn Jobs (Search + Feed Fallback)
+  2. 📰 Scan LinkedIn Feed Directly (Hiring Posts)
+  3. 📄 View Matched Jobs Report (.md)
+  4. 🔑 Login to LinkedIn (Save Browser Session)
+  5. 🧠 Triage Matched Jobs (next actions + recruiter openers)
+  6. 💬 Run LinkedIn Network Outreach (Autonomous SemIf DM Agent)
+  0. 🚪 Exit
+===============================================================
 ```
 
-#### CLI Options:
-| Flag | Short | Default | Description |
-|---|---|---|---|
-| `--query` | `-q` | `UI/UX Designer` | Primary job search query |
-| `--min-matches` | `-n`, `-m` | `10` | Target minimum qualifying matches to find before stopping |
-| `--location` | `-l` | `""` | Search location (empty = candidate network / flexible) |
-| `--recency` | `-r` | `week` | Posting recency filter (`24h`, `week`, `any`) |
-| `--work-type` | `-w` | `all` | Work type filter (`all`, `remote`, `on_site`, `hybrid`) |
-| `--min-score` | `-s` | `70` | Minimum match percentage (0–100) required to qualify |
-| `--max-pages` | | `2` | Max search pages to evaluate per query before rotating or falling back |
-| `--limit` | `--max-eval` | `120` | Safety ceiling of total raw jobs to evaluate across queries |
-| `--max-feed-scrolls` | | `80` | Safety ceiling of scrolls on the LinkedIn feed |
-| `--feed-only` | | `False` | Scan LinkedIn News Feed directly without searching job posts first |
-| `--easy-apply` | | `False` | Only Easy Apply jobs (`f_AL=true`, recent-first) |
-| `--criteria` | | `None` | Custom SemIf criteria lines (overrides defaults) |
-| `--daily-cap` | | `80` | Max LLM evaluations per run (safety cap) |
-| `--rotate-queries` | | `True` | Automatically rotate related queries if under target |
-| `--view-profiles` | | `True` | Visit recruiter and company profiles to gather details |
-| `--save-on-linkedin` | | `False` | Also click "Save" bookmark button on LinkedIn |
-| `--headless` | | `False` | Run browser in background headless mode |
+---
+
+### 2. Run the LinkedIn Job Hunter CLI
+
+```bash
+# Run using the unified agent CLI (reads defaults from .env):
+python3 -m linkedin_hunter.agent
+
+# Custom search: Target 10 remote design roles posted this week:
+python3 -m linkedin_hunter.agent --query "UI/UX Designer" --work-type remote --recency week --min-matches 10
+
+# Scan the LinkedIn News Feed directly for hiring opportunities:
+python3 -m linkedin_hunter.agent --feed-only --min-matches 10
+```
 
 ---
 
-### Method 4: SemIf Decision Engine & Jev Choice Server
-
-To test or benchmark the underlying SemIf decision engine:
+### 3. Run the LinkedIn Network Outreach Agent
 
 ```bash
-# Run SemIf Interactive Test UI on port 8080:
-cd backend
-python3 -m semif_phase1.server --port 8080
+# Dry-run simulation (verifies delta sync, scores candidates, checks threads, NO messages sent):
+python3 -m linkedin_outreach.agent --dry-run
 
-# Run TypeSafe Jev Drop-In Choice Server on port 8090:
+# Live outreach run (delivers messages up to daily safety limit):
+python3 -m linkedin_outreach.agent --limit 15
+
+# Sweep 1st-degree People Search directly:
+python3 -m linkedin_outreach.agent --search-only --start-page 1 --max-pages 20
+```
+
+---
+
+### 4. Run SemIf Decision Services
+
+```bash
+# Start SemIf Choice Server on port 8090:
 python3 -m semif_phase1.jev_server --port 8090
+
+# Start SemIf Interactive Visual Calibrator on port 8080:
+python3 -m semif_phase1.server --port 8080
 ```
 
 ---
 
-## 📡 Web Dashboard API Endpoints
+## ⚙️ Configuration Reference (`.env`)
 
-The dashboard server exposes clean JSON REST endpoints:
+Both agents automatically load configuration from `.env` files.
 
-| Endpoint | Method | Description |
+### LinkedIn Job Hunter Settings (`linkedin_hunter/.env`)
+
+| Variable | Default | Description |
 |---|---|---|
-| `/` | `GET` | Analogue web dashboard interface |
-| `/api/jobs` | `GET` | List of all matched opportunities and scoring details |
-| `/api/stats` | `GET` | Dedup/eval stats (`seen_ids`, `seen_jd_hashes`, `skip_reasons`, `matched`) |
-| `/api/agent/status` | `GET` | Active agent status (`running`, `agent`, live log buffer) |
-| `/api/agent/launch` | `POST` | Launch LinkedIn Hunter or Feed agent with parameters |
-| `/api/agent/stop` | `POST` | Send stop flag to halt running browser agent gracefully |
-| `/api/agent/clear_logs` | `POST` | Clear in-memory terminal console buffer |
-| `/output/jobs_report.md` | `GET` | Rendered / raw Markdown jobs report |
-| `/output/jobs.csv` | `GET` | Downloadable CSV export of matched opportunities |
+| `ENABLE_HUMAN_DELAYS` | `0` (False) | When `0`, eliminates all artificial sleep pauses for maximum execution speed |
+| `HUMAN_DELAY_MIN` | `0.0` | Minimum random navigation pause in seconds |
+| `HUMAN_DELAY_MAX` | `0.0` | Maximum random navigation pause in seconds |
+| `CARD_CLICK_DELAY_MIN` | `0.0` | Minimum pause before clicking job cards |
+| `CARD_CLICK_DELAY_MAX` | `0.0` | Maximum pause before clicking job cards |
+| `MIN_MATCHES` | `10` | Target minimum matching jobs to locate before halting |
+| `MIN_SCORE` | `70` | Minimum percentage score (0–100) required to consider a job a match |
+| `MAX_PAGES_PER_QUERY` | `2` | Maximum search result pages to paginate per query before rotating |
+| `JOB_LIMIT` | `50` | Maximum raw job postings to inspect per query |
+| `MAX_FEED_SCROLLS` | `80` | Maximum scroll actions when scanning the LinkedIn News Feed |
+| `LLM_BASE_URL` | `http://localhost:1234/v1` | Local LLM server endpoint |
+| `LLM_MODEL` | `qwen3.5-4b` | Model identifier used for semantic logprob evaluation |
+
+### LinkedIn Network Outreach Settings (`linkedin_outreach/.env`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `TOP_N` | `25` | Target batch size of uncontacted candidates to maintain in working pool |
+| `DAILY_LIMIT` | `15` | Maximum number of direct messages to send per calendar day |
+| `PACING` | `0` | Delay in seconds between message dispatches (set to `0` for zero delays) |
+| `PACING_JITTER` | `0` | Random variance added to pacing delay in seconds |
+| `THREAD_CHECK` | `1` | Check whether a message thread already has historical messages |
+| `THREAD_CHECK_STRICT` | `0` | When `1`, skips contact if thread check returns uncertain status |
+| `SEMIF_ENABLED` | `1` | Use SemIf decision scoring for candidate relevance filtering |
+| `MIN_RELEVANCE_SCORE` | `50` | Minimum score (0–100) to proceed with outreach message |
+| `FILTER_LOW_RELEVANCE`| `1` | Automatically skip candidates scoring below `MIN_RELEVANCE_SCORE` |
+| `START_PAGE` | `1` | First search page to inspect during network synchronization |
+| `MAX_PAGES` | `20` | Maximum search pages to sweep during network synchronization |
+| `PORTFOLIO_URL` | `https://mushfiqkabiruix.vercel.app/` | Portfolio URL injected into message templates |
 
 ---
 
-## 📄 Candidate Profile & Alignment Criteria
+## 🔒 Safety, Delta-Sync & Ledger Architecture
 
-Candidate qualifications are loaded from [`Mushfiq_Kabir_CV.json`](Mushfiq_Kabir_CV.json):
-- **Candidate Label:** UI/UX & Product Designer.
-- **Key Competencies:** Figma, Design Systems, Auto-Layout, Component Libraries, User Research, Prototyping.
-- **Criteria Definition:**
-  ```
-  [Required] Role focuses on UI/UX, Product Design, Visual Interface, or Figma design.
-  [Required] Hands-on Figma wireframing, prototyping, design systems, or component libraries.
-  [Preferred] Experience with SaaS platforms, web apps, or mobile interfaces.
-  [Dealbreaker] Does NOT require 8+ years executive leadership or full-stack software coding.
-  ```
+1. **Non-Invasive Browser Attachment**:
+   - The agents attach directly to your existing browser session over **Chrome DevTools Protocol (CDP)** on port `9222`.
+   - No separate automation browser profiles or telltale `navigator.webdriver` flags are used.
+2. **$O(1)$ Delta-Sync Registry (`connections_registry.json`)**:
+   - Remembers all synchronized connections and their status (`messaged`, `skipped`, `pending`).
+   - Enables instant $O(1)$ verification without visiting candidate profiles or opening message windows.
+3. **Immutable Append-Only Ledger (`Complete.md`)**:
+   - Every sent message is recorded with a permanent timestamp and profile URL in `linkedin_outreach/data/Complete.md`.
+   - Never modified or truncated by the system.
+4. **Thread-Level History Verification**:
+   - Before typing any message, the agent inspects the conversation DOM. If outbound messages already exist in the thread, it aborts dispatch and marks the candidate as already contacted.
 
 ---
 
-## 🛡 Security & Design Standards
+## 🧪 Testing & Verification
 
-- **Zero Credentials in Code:** Reuses active authenticated sessions via Chrome DevTools Protocol (CDP). Real API keys live only in ignored `.env` files (root + `backend/.env`), never in git.
-- **Human-Paced Navigation:** Uses random human jitter (2.0–4.5s) between clicks and scrolls to respect LinkedIn rate limits, with daily evaluation caps.
-- **Analogue Minimalist Aesthetic:** Monochromatic palette (`#000000`, `#ffffff`, `#666666`), negative letter tracking, 18px rounded cards, 9999px pills, zero artificial shadows.
+The repository contains 128 automated tests across all subsystems:
+
+```bash
+# Run SemIf backend test suite (53 tests):
+pytest backend/tests
+
+# Run LinkedIn Hunter test suite (15 tests):
+pytest linkedin_hunter/tests
+
+# Run LinkedIn Outreach test suite (60 tests):
+python3 -m unittest discover linkedin_outreach/tests
+
+# Verify backwards-compatibility symlink:
+python3 -m unittest discover linkedin_connections_SMS/tests
+```
+
+---
+
+## 📄 License
+
+This repository is distributed under the MIT License. See [LICENSE](backend/LICENSE) for details.

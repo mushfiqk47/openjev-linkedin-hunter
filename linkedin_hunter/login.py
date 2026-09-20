@@ -1,5 +1,3 @@
-"""One-time LinkedIn login helper to save your session cookies."""
-
 import time
 from playwright.sync_api import sync_playwright
 from .config import BASE_DIR

@@ -1,5 +1,3 @@
-"""Official-style Qwen3 reranker readout adapted to declared decision options."""
-
 from __future__ import annotations
 
 import inspect
@@ -22,7 +20,6 @@ RETRIEVAL_INSTRUCTION = (
 )
 PROMPT_VERSION = "qwen3-reranker-native-options-v1"
 
-
 def _encode(tokenizer, row, option, max_tokens):
     experiment = row.get("provenance", {}).get("experiment")
     instruction = RETRIEVAL_INSTRUCTION if experiment in {"code-rag", "company-brain"} else DECISION_INSTRUCTION
@@ -37,7 +34,6 @@ def _encode(tokenizer, row, option, max_tokens):
         raise ValueError(f"Row {row['id']} option {option['id']}: {len(ids)} tokens exceed limit {max_tokens}")
     return ids, digest(text)
 
-
 def _answer_ids(tokenizer):
     no = tokenizer.encode("no", add_special_tokens=False)
     yes = tokenizer.encode("yes", add_special_tokens=False)
@@ -47,9 +43,8 @@ def _answer_ids(tokenizer):
         raise ValueError("Tokenizer conversion differs from the official yes/no token contract")
     return no[0], yes[0]
 
-
 def score_pair_batch(model, tokenizer, specs, max_tokens: int = 4096):
-    """Score independent row/option relevance pairs in one native batch."""
+
     import torch
 
     if not specs:
@@ -95,7 +90,6 @@ def score_pair_batch(model, tokenizer, specs, max_tokens: int = 4096):
         "forward_seconds": elapsed,
         "padded_tokens": int(inputs["input_ids"].numel()),
     }
-
 
 def score(model, tokenizer, row: dict, metadata: dict, max_tokens: int = 4096) -> dict:
     import torch

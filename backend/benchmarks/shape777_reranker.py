@@ -1,5 +1,3 @@
-"""Reproduce reranker pair batching on the owned 37x21 fixture."""
-
 from __future__ import annotations
 
 import argparse
@@ -13,7 +11,6 @@ from pathlib import Path
 from semif_phase1.core import load_causal_model, softmax
 from semif_phase1.reranker import score_pair_batch
 
-
 def percentile(values, fraction):
     ordered = sorted(values)
     index = (len(ordered) - 1) * fraction
@@ -21,7 +18,6 @@ def percentile(values, fraction):
     return ordered[lower] + (
         ordered[min(lower + 1, len(ordered) - 1)] - ordered[lower]
     ) * (index - lower)
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -110,7 +106,6 @@ def main() -> None:
         "".join(json.dumps(row, allow_nan=False) + "\n" for row in prediction_lines)
     )
     print(json.dumps(report["results"]))
-
 
 if __name__ == "__main__":
     main()

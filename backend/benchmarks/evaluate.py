@@ -1,11 +1,9 @@
-"""Every declared row counts; missing, invalid and unparsed outputs remain failures."""
 import argparse
 from collections import defaultdict
 import json
 import math
 from pathlib import Path
 import random
-
 
 def indexed(rows, name):
     result = {}
@@ -15,13 +13,11 @@ def indexed(rows, name):
         result[row['id']] = row
     return result
 
-
 def read_jsonl(path):
     with open(path) as stream:
         rows = [json.loads(line) for line in stream if line.strip()]
     indexed(rows, str(path))
     return rows
-
 
 def vector(values, ids):
     if isinstance(values, dict):
@@ -36,7 +32,6 @@ def vector(values, ids):
     if abs(sum(values)-1) > 1e-4:
         raise ValueError('Probabilities do not sum to one')
     return values
-
 
 def align(gold, predictions):
     truth, outputs = indexed(gold, 'gold'), indexed(predictions, 'predictions')
@@ -85,13 +80,11 @@ def align(gold, predictions):
         rows.append(row)
     return rows
 
-
 def clusters(rows, key='group_id'):
     result = defaultdict(list)
     for row in rows:
         result[row[key]].append(row)
     return result
-
 
 def basic(rows):
     if not rows:
@@ -105,7 +98,6 @@ def basic(rows):
         f1.append(2*tp/(2*tp+fp+fn))
     return dict(n=len(rows), accuracy=sum(r['correct'] for r in rows)/len(rows),
                 balanced_accuracy=sum(recalls)/len(recalls), macro_f1=sum(f1)/len(f1))
-
 
 def summarize(rows):
     result = basic(rows)
@@ -146,14 +138,12 @@ def summarize(rows):
     result['accuracy_cluster_bootstrap_95'] = [values[25],values[974]]
     return result
 
-
 def balanced_metric(rows):
     families = clusters(rows,'family')
     return sum(basic(part)['balanced_accuracy'] for part in families.values())/len(families)
 
-
 def paired_comparison(left, right, samples=1000, seed=217):
-    """Use identical source-group draws on both systems, stratified by family."""
+
     a,b = indexed(left,'left'),indexed(right,'right')
     if a.keys()!=b.keys() or not a or samples < 40:
         raise ValueError('Need same nonempty gold IDs and at least 40 bootstrap samples')
@@ -180,7 +170,6 @@ def paired_comparison(left, right, samples=1000, seed=217):
         source_groups=sum(map(len,strata.values())),samples=samples,seed=seed,
         method='Paired source-group bootstrap stratified by family; represented gold classes per draw')
 
-
 def evaluate(gold,predictions,comparison=None):
     rows = align(gold,predictions)
     families = {name:summarize(part) for name,part in clusters(rows,'family').items()}
@@ -199,9 +188,8 @@ def evaluate(gold,predictions,comparison=None):
         result['paired_comparison'] = paired_comparison(rows,align(gold,comparison))
     return result
 
-
 def screening_gate(gold, predictions, policy='distribution', threshold=0.8):
-    """Frozen semantic-decision gate; not a benchmark of executed workflow actions."""
+
     if policy not in ('distribution', 'native') or threshold != 0.8:
         raise ValueError('Screen policy is frozen: distribution p>=0.8 or native parsed decisions')
     rows = align(gold, predictions)
@@ -268,7 +256,6 @@ def screening_gate(gold, predictions, policy='distribution', threshold=0.8):
                 original_correct_automatic_decisions=original_correct_automatic,
                 accuracy_including_abstentions=basic(rows)['accuracy'], decisions=decisions,
                 limitation='Small falsification screen; zero errors does not certify safety/calibration.')
-
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)

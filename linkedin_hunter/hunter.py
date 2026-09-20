@@ -1,5 +1,3 @@
-"""Main CLI entrypoint for LinkedIn Job Hunter (thin Adapter over hunt_core)."""
-
 import argparse
 import sys
 from .config import (
@@ -12,7 +10,6 @@ from .evaluator import JobEvaluator
 from .browser import LinkedInBrowser
 from .hunt_core import HuntDeps, HuntHooks, HuntParams, run_hunt
 from .storage import JobStore, load_seen_state
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -117,7 +114,12 @@ def main():
         "--daily-cap",
         type=int,
         default=80,
-        help="Max LLM evaluations per run (safety cap, default: 80)",
+        help="Max LLM evaluations per run (soft cap; only enforced with --enforce-caps)",
+    )
+    parser.add_argument(
+        "--enforce-caps",
+        action="store_true",
+        help="Restore the old early-stop at --daily-cap/--limit (default: exhaustive triage of every page and feed post)",
     )
     parser.add_argument(
         "--headless",
@@ -139,7 +141,6 @@ def main():
     print(f"   Max Pages / Query:  {args.max_pages}")
     print("=" * 68)
 
-    # 1. Load Candidate Profile
     try:
         cv = load_cv_data()
         name = cv.get("basics", {}).get("name", "Mushfiq Kabir")
@@ -148,14 +149,12 @@ def main():
         print(f"[✗] Failed to load CV: {e}")
         sys.exit(1)
 
-    # 2. Initialize Evaluator & Storage
     evaluator = JobEvaluator()
     store = JobStore()
     seen_state = load_seen_state()
     print(f"[✓] Connected to local evaluator (LM Studio: {evaluator.model})")
     print(f"[✓] Memory: {len(seen_state['seen_ids'])} job IDs, {len(seen_state['seen_signatures'])} signatures, {len(seen_state['searched_queries'])} queries recorded")
 
-    # 3. Thin Adapter: argparse -> HuntParams, print hooks -> HuntHooks
     params = HuntParams(
         query=args.query, location=args.location, recency=args.recency,
         work_type=args.work_type, min_matches=args.min_matches, min_score=args.min_score,
@@ -164,13 +163,13 @@ def main():
         save_on_linkedin=args.save_on_linkedin, easy_apply=args.easy_apply,
         explore_feed=True, feed_only=args.feed_only,
         max_feed_scrolls=args.max_feed_scrolls, criteria=getattr(args, "criteria", None),
+        enforce_caps=args.enforce_caps,
     )
 
     def _log(msg: str, level: str = "info"):
         tag = {"match": "[★]", "success": "[✓]", "warning": "[!]"}.get(level, "[i]")
         print(f"  {tag} {msg}")
 
-    # 4. Start Browser (injected dependency, not created inside the Module)
     browser = LinkedInBrowser(headless=args.headless)
 
     try:
@@ -185,6 +184,7 @@ def main():
         print("\n" + "=" * 68)
         print("🎉 Hunt Complete!")
         print(f"   Evaluated:       {result.evaluated} postings & feed updates")
+        print(f"   Filtered out:    {result.skipped} (each with a recorded reason)")
         print(f"   Matched Target:  {result.matched} / {params.min_matches} opportunities saved")
         print(f"   Report:          {store.md_file}")
         print(f"   Data:            {store.json_file}")
@@ -194,7 +194,6 @@ def main():
         print("\n[!] Run stopped by user.")
     finally:
         browser.close()
-
 
 if __name__ == "__main__":
     main()
