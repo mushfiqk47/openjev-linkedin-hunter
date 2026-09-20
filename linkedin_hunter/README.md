@@ -15,6 +15,9 @@ Matching jobs and feed opportunities are saved to `output/jobs_report.md`, `outp
   Specifically targets `<main id="workspace">` / `.scaffold-layout__main` with `PageDown` key integration to trigger LinkedIn's dynamic virtual loading on every scroll.
 - **Sub-300ms Logprob Scoring:**
   Evaluates fit probabilities directly from native token logprobs in LM Studio. Zero prompt hallucinations, zero JSON parsing failures, and zero timeouts. BM25 prescreen filters obvious non-fits first; scores are calibrated (cap 94) with `role/tools/level/domain` breakdowns, real JD keywords, gaps, and cover hooks.
+- **Model-Judged Fit Axes (`judgments.py`):** The `role/tools/level/domain` breakdown is scored by the model itself — four two-option readouts blended into the fit score — instead of regex heuristics. Set `use_model_axes=False` (`JobEvaluator`) to fall back to the deterministic heuristics and one readout per posting.
+- **Exhaustive Triage with Reasons:** Caps are soft by default, so every card and feed post is evaluated and every non-match records a one-line `skip_reason` (`needs_review` flags borderline cases). `--enforce-caps` restores the old early-stop.
+- **Apply-Triage Agent (`triage.py`):** `python -m linkedin_hunter.triage` chains instant judgments over each saved match — employer fit, freshness, cover-letter angle, a recruiter opener, and one recommended next action.
 - **Persistent Anti-Duplicate Memory:**
   Maintains ID + signature (`{title} @@ {company}`) + JD-body hashes in `seen_jobs.json` to skip previously evaluated cards in 0.001s — including identical JDs reposted under different posters (merged as aliases).
 - **Easy Apply + Extract-First Scraping:**
@@ -54,6 +57,17 @@ Launch the dashboard:
 ```
 Open **`http://127.0.0.1:8085`** to launch the agent with one click, watch live activity logs, and view formatted reports.
 
+### Method 3: Triage the saved matches
+```bash
+./.venv/bin/python -m linkedin_hunter.triage             # triage every saved match
+./.venv/bin/python -m linkedin_hunter.triage --dry-run   # preview without writing back
+```
+
+### Method 4: Test the hunter logic (no browser, no LM Studio)
+```bash
+python -m pytest linkedin_hunter/tests -q
+```
+
 ---
 
 ## ⚙️ CLI Options
@@ -72,7 +86,8 @@ Open **`http://127.0.0.1:8085`** to launch the agent with one click, watch live 
 | `--feed-only` | | `False` | Scan LinkedIn News Feed directly without searching job posts first |
 | `--easy-apply` | | `False` | Only Easy Apply jobs (`f_AL=true`, recent-first) |
 | `--criteria` | | `None` | Custom SemIf criteria lines (overrides defaults) |
-| `--daily-cap` | | `80` | Max LLM evaluations per run (safety cap) |
+| `--daily-cap` | | `80` | Soft cap; only enforced with `--enforce-caps` |
+| `--enforce-caps` | | `False` | Restore the old early-stop at `--daily-cap`/`--limit` (default is exhaustive triage) |
 | `--rotate-queries` | | `True` | Auto-rotate related queries if under target |
 | `--view-profiles` | | `True` | Visit recruiter and company profiles to gather details |
 | `--save-on-linkedin` | | `False` | Also click "Save" bookmark button on LinkedIn |

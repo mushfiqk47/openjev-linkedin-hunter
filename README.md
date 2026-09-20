@@ -32,7 +32,9 @@ jev-api/
 ├── linkedin_hunter/               # Autonomous LinkedIn Browser Agent
 │   ├── browser.py                 # Playwright CDP automation & feed scraper (extract-first, jittered pacing)
 │   ├── hunt_core.py               # Deep hunting module: single run_hunt() seam for CLI + Web
-│   ├── evaluator.py               # Calibrated SemIf evaluator (BM25 prescreen, factor breakdown)
+│   ├── evaluator.py               # Calibrated SemIf evaluator (BM25 prescreen, model-judged axes)
+│   ├── judgments.py               # Atomic model judgments (binary / classify / rank / axes)
+│   ├── triage.py                  # Apply-triage agent: next action, cover angle, recruiter opener
 │   ├── hunter.py                  # Thin CLI adapter over hunt_core (argparse → HuntParams)
 │   ├── storage.py                 # JD-hash dedup, enriched reports (Top 3, priorities, hooks)
 │   ├── config.py                  # Queries, filters, thresholds, skill vocabulary, timing
@@ -59,6 +61,8 @@ jev-api/
 - **BM25 Prescreen (zero LLM cost):** Disqualified titles and no-design-signal posts filter to `SKIP` before any model call.
 - **Calibrated Scores:** Raw logprob percentages are monotonically compressed (cap 94) to counter instruct-model overconfidence; `raw_score` is preserved and `low_margin` flags borderline cases for manual review.
 - **Factor Breakdown + Real Gaps:** Each evaluation returns `role/tools/level/domain` fits, JD keywords extracted against a skill vocabulary, matched vs missing skills, employment type, and a cover-letter hook.
+- **Model-Judged Axes + Exhaustive Triage:** `role/tools/level/domain` are scored by the model (blended into the fit score) rather than regex; caps are soft by default so every card and feed post is evaluated, each non-match carrying a one-line `skip_reason`.
+- **Apply-Triage Agent:** `python -m linkedin_hunter.triage` chains instant judgments over saved matches — employer fit, freshness, cover-letter angle, recruiter opener, and one recommended next action.
 - **CV Profile Alignment:** Compares candidate skills, experience level, tools (Figma, Design Systems), and dealbreakers against job descriptions and feed post content.
 
 ### 2. Autonomous LinkedIn Hunter
@@ -167,7 +171,8 @@ Run the browser hunter with custom parameters:
 | `--feed-only` | | `False` | Scan LinkedIn News Feed directly without searching job posts first |
 | `--easy-apply` | | `False` | Only Easy Apply jobs (`f_AL=true`, recent-first) |
 | `--criteria` | | `None` | Custom SemIf criteria lines (overrides defaults) |
-| `--daily-cap` | | `80` | Max LLM evaluations per run (safety cap) |
+| `--daily-cap` | | `80` | Soft cap; only enforced with `--enforce-caps` |
+| `--enforce-caps` | | `False` | Restore the old early-stop at `--daily-cap`/`--limit` (default is exhaustive triage) |
 | `--rotate-queries` | | `True` | Automatically rotate related queries if under target |
 | `--view-profiles` | | `True` | Visit recruiter and company profiles to gather details |
 | `--save-on-linkedin` | | `False` | Also click "Save" bookmark button on LinkedIn |

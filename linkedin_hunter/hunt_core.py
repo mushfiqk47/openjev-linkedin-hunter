@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Iterable, Protocol
 
 from .config import DEFAULT_QUERIES, DEFAULT_MIN_SCORE, DEFAULT_MIN_MATCHES
-from .storage import save_searched_query
+from .storage import record_skip_reason, save_searched_query
 
 
 @dataclass
@@ -43,12 +43,16 @@ class HuntParams:
     feed_only: bool = False
     max_feed_scrolls: int = 8
     criteria: list[str] | None = None
+    # Feature 2: caps are soft by default so every card/feed post is evaluated and
+    # reasoned about. Set True to restore the old daily_cap/limit early-stop safety.
+    enforce_caps: bool = False
 
 
 @dataclass
 class HuntResult:
     matched: int = 0
     evaluated: int = 0
+    skipped: int = 0
     saved_job_ids: list[str] = field(default_factory=list)
 
 
@@ -72,6 +76,9 @@ class HuntDeps:
     # Query recorder; defaults to persistent save_searched_query so tests can
     # inject a no-op and stay hermetic (no real seen_jobs.json writes).
     record_query: Callable[..., None] | None = None
+    # Skip-reason recorder; same injectable pattern so tests never write
+    # seen_jobs.json.
+    record_skip: Callable[..., None] | None = None
 
 
 @dataclass
@@ -97,11 +104,12 @@ def run_hunt(params: HuntParams, deps: HuntDeps, hooks: HuntHooks = HuntHooks())
         result.matched = _feed_phase(params, deps, hooks, result, current_matched=0)
         return result
 
+    cap = min(params.limit, params.daily_cap)
     for q_idx, q in enumerate(build_queries(params.query, params.auto_rotate)):
         if hooks.should_stop() or result.matched >= params.min_matches:
             break
-        if result.evaluated >= min(params.limit, params.daily_cap):
-            hooks.on_event(f"Cap reached ({min(params.limit, params.daily_cap)} evaluations).", "warning")
+        if params.enforce_caps and result.evaluated >= cap:
+            hooks.on_event(f"Cap reached ({cap} evaluations).", "warning")
             break
         q_norm = q.strip().lower()
         if q_norm in seen.get("searched_queries", set()) and q_idx > 0:
@@ -110,7 +118,8 @@ def run_hunt(params: HuntParams, deps: HuntDeps, hooks: HuntHooks = HuntHooks())
         (deps.record_query or save_searched_query)(q, seen)
         hooks.on_event(f"Searching [{q_idx + 1}]: '{q}' ({result.matched}/{params.min_matches})", "info")
 
-        remaining = min(params.limit, params.daily_cap) - result.evaluated
+        # Exhaustive triage: pass the full per-query bound unless caps are enforced.
+        remaining = (cap - result.evaluated) if params.enforce_caps else params.limit
         for raw_job in deps.search_jobs(
             keywords=q, location=params.location, recency=params.recency,
             work_type=params.work_type, limit=remaining, max_pages=params.max_pages,
@@ -120,26 +129,33 @@ def run_hunt(params: HuntParams, deps: HuntDeps, hooks: HuntHooks = HuntHooks())
         ):
             if hooks.should_stop():
                 break
-            if result.evaluated >= min(params.limit, params.daily_cap):
+            if params.enforce_caps and result.evaluated >= cap:
                 break
             result.evaluated += 1
             title, company = raw_job.get("title", ""), raw_job.get("company", "")
             eval_res = deps.evaluator.evaluate(title, company, raw_job.get("description", ""), criteria=params.criteria)
             score = int(eval_res.get("match_score", 0))
             if eval_res.get("prescreen"):
-                hooks.on_event(f"Pre-screen filtered: {title} @ {company}", "info")
+                reason = eval_res.get("skip_reason") or "Pre-screen filtered."
+                result.skipped += 1
+                (deps.record_skip or record_skip_reason)(raw_job.get("job_id", ""), reason, seen)
+                hooks.on_event(f"Pre-screen filtered: {title} @ {company} \u2014 {reason}", "info")
                 continue
+            review = " [review]" if eval_res.get("needs_review") else ""
             low = " [low-margin]" if eval_res.get("low_margin") else ""
             if score >= params.min_score:
                 result.matched += 1
                 deps.store.save_job({**raw_job, **eval_res})
                 result.saved_job_ids.append(str(raw_job.get("job_id", "")))
-                hooks.on_event(f"Match {result.matched}/{params.min_matches}: {title} @ {company} ({score}%){low}", "match")
+                hooks.on_event(f"Match {result.matched}/{params.min_matches}: {title} @ {company} ({score}%){low}{review}", "match")
                 if result.matched >= params.min_matches:
                     hooks.on_event(f"Target {params.min_matches} reached.", "success")
                     break
             else:
-                hooks.on_event(f"Filtered out: {title} @ {company} ({score}%)", "info")
+                result.skipped += 1
+                reason = eval_res.get("skip_reason") or "Below fit threshold."
+                (deps.record_skip or record_skip_reason)(raw_job.get("job_id", ""), reason, seen)
+                hooks.on_event(f"Filtered out: {title} @ {company} ({score}%) \u2014 {reason}{review}", "info")
         if result.matched >= params.min_matches:
             break
 
@@ -159,6 +175,7 @@ def _feed_phase(params: HuntParams, deps: HuntDeps, hooks: HuntHooks,
         target_matches=params.min_matches, current_matched=current_matched,
         max_scrolls=params.max_feed_scrolls, view_profiles=params.view_profiles,
         criteria=params.criteria,
+        exhaustive=not params.enforce_caps,
         on_status_update=lambda s: hooks.on_event(s, "info"),
         stop_check=hooks.should_stop,
     )

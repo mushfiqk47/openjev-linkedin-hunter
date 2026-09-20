@@ -1,9 +1,24 @@
-"""Verify that the machine-readable summary is backed by committed raw evidence."""
+"""Verify that the machine-readable summary is backed by committed raw evidence.
+
+The published evidence bundles (`results/`) are not included in this checkout;
+regenerate them with the commands in `benchmarks/README.md` before running.
+"""
 from collections import defaultdict
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+REQUIRED_INPUTS = (
+    "results/phase1-summary.json",
+    "results/raw/quality-comparison.json",
+    "results/raw/perturbation-comparison.json",
+    "results/raw/shape777-direct.json",
+    "results/raw/shape777-reranker.json",
+    "results/raw/decision-vs-compact-array.json",
+    "results/raw/shape777-reranker.predictions.jsonl",
+)
 
 
 def load(path):
@@ -28,6 +43,13 @@ def rows(path):
 
 
 def main():
+    missing = [path for path in REQUIRED_INPUTS if not (ROOT / path).exists()]
+    if missing:
+        print("verify_published: published results are not included in this checkout.")
+        print("Regenerate them first (see benchmarks/README.md), then re-run. Missing:")
+        for path in missing:
+            print(f"  {path}")
+        return 1
     summary = load("results/phase1-summary.json")
     quality = load("results/raw/quality-comparison.json")
     perturb = load("results/raw/perturbation-comparison.json")
@@ -116,7 +138,8 @@ def main():
     close(generation["wall_time_ratio_generation_over_direct"], compact["median_wall_ratio"])
     checks += 5
     print(json.dumps({"verified_summary_claims": checks, "status": "ok"}))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)

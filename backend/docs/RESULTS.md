@@ -15,7 +15,7 @@ The three base checkpoints were scored with the same native BF16 direct-logit in
 | **Qwen3.5-4B** | **0.813** | **0.766** | 0.845 |
 | Published Jev | — | — | **0.883** |
 
-The owned quality values belong to the native BF16 checkpoints; they isolate model capability. TypeSafe agreement is an equal-case macro over the same selected 102 public rows and 20 cases for all four systems. Exact revisions and row-level predictions are in `results/raw/`. The retired browser smoke timings remain in `results/raw/browser-model-ladder.json` for provenance only.
+The owned quality values belong to the native BF16 checkpoints; they isolate model capability. TypeSafe agreement is an equal-case macro over the same selected 102 public rows and 20 cases for all four systems. Exact revisions and row-level predictions were part of this project's published artifacts.
 
 | Frozen workload | Metric | Direct Qwen3.5-4B | Qwen3-Reranker-4B | Public Jev value |
 |---|---|---:|---:|---:|
@@ -47,9 +47,9 @@ The direct model's option-order flips matter even though variant accuracy remain
 
 In a focused same-model comparison on one owned state with 21 criteria, parallel direct readout returned 21 probability pairs in a median **1.023 seconds** and generated no answer tokens. The strongest valid naïve baseline requested only an ordered JSON array of `"yes"`/`"no"` strings. It took a median **5.332 seconds**, including 0.489 seconds to first token, and emitted 111 tokens. All three arrays were valid and identical. They agreed with direct argmax on 18/21 criteria. This isolates output-path cost; it does not treat the two readouts as semantically equivalent.
 
-A stricter request for a minified, whitespace-free array was also tested. The model repeated values past the required 21 entries and hit the 128-token cap in all three runs, so it is recorded as a failure rather than used to inflate the speed ratio. The earlier verbose 21-key confidence-object comparison (1.066 versus 18.229 seconds) remains in `results/raw/decision-vs-verbose-json.json`, but it is no longer the headline baseline.
+A stricter request for a minified, whitespace-free array was also tested. The model repeated values past the required 21 entries and hit the 128-token cap in all three runs, so it is recorded as a failure rather than used to inflate the speed ratio. The earlier verbose 21-key confidence-object comparison (1.066 versus 18.229 seconds) was recorded in the project's published artifacts, but it is no longer the headline baseline.
 
-The finalized one-RTX-3090 measurements are recorded in `results/phase1-summary.json`:
+The finalized one-RTX-3090 measurements were recorded in the project's published summary:
 
 | Mode | Wall time | Decisions/s | State p50 | Argmax drift vs batch-1/fresh |
 |---|---:|---:|---:|---:|

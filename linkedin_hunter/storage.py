@@ -167,6 +167,20 @@ def save_seen_job(job_id: str, title: str, company: str, seen_state: dict | None
         _persist_seen(current, path)
 
 
+def record_skip_reason(job_id: str, reason: str, seen_state: dict | None = None,
+                       path: Path = SEEN_JOBS_FILE):
+    """Persist a one-line 'why skipped' explanation for an evaluated non-match."""
+    if not reason:
+        return
+    if seen_state is not None:
+        seen_state.setdefault("skip_reasons", {})[str(job_id)] = reason
+        _persist_seen(seen_state, path)
+    else:
+        current = load_seen_state(path)
+        current.setdefault("skip_reasons", {})[str(job_id)] = reason
+        _persist_seen(current, path)
+
+
 def save_searched_query(query: str, seen_state: dict | None = None, path: Path = SEEN_JOBS_FILE):
     """Records that a search query has been performed to avoid repeating the exact search."""
     q_norm = query.strip().lower()
@@ -193,21 +207,14 @@ def is_job_seen(job_id: str, title: str, company: str, seen_state: dict, descrip
     return False
 
 
-def load_seen_job_ids(path: Path = SEEN_JOBS_FILE) -> set[str]:
-    state = load_seen_state(path)
-    return state["seen_ids"]
-
-
-def save_seen_job_id(job_id: str, path: Path = SEEN_JOBS_FILE):
-    save_seen_job(job_id, "", "", path=path)
-
-
 def get_stats(path: Path = SEEN_JOBS_FILE) -> dict:
     st = load_seen_state(path)
     reasons: dict[str, int] = {}
     for r in st.get("skip_reasons", {}).values():
         reasons[r] = reasons.get(r, 0) + 1
     return {
+        "evaluations": len(st.get("skip_reasons", {})),
+        "top_skip_reasons": sorted(reasons.items(), key=lambda kv: -kv[1])[:5],
         "seen_ids": len(st["seen_ids"]),
         "seen_signatures": len(st["seen_signatures"]),
         "seen_jd_hashes": len(st.get("seen_jd_hashes", set())),
@@ -284,6 +291,14 @@ class JobStore:
         self._write_markdown_report(jobs)
         self._write_csv_report(jobs)
 
+    def rewrite(self, jobs: list[dict]):
+        """Persist the full job list (e.g. after apply-triage) and regenerate reports."""
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        with open(self.json_file, "w", encoding="utf-8") as f:
+            json.dump(jobs, f, indent=2, ensure_ascii=False)
+        self._write_markdown_report(jobs)
+        self._write_csv_report(jobs)
+
     def _write_markdown_report(self, jobs: list[dict]):
         is_feed = lambda j: str(j.get("job_id", "")).startswith("feed_") or "Feed" in str(j.get("location", ""))
         site_jobs = [j for j in jobs if not is_feed(j)]
@@ -352,6 +367,17 @@ class JobStore:
                 lines.append(f"- **Gaps to address:** `{gaps}`")
             if job.get("cover_hook"):
                 lines.append(f"- **Cover opener:** _{job['cover_hook']}_")
+            triage = job.get("triage") or {}
+            if triage:
+                lines.append(
+                    f"- **Next action:** `{triage.get('next_action', '')}` "
+                    f"· **Employer fit:** {triage.get('employer_fit', '')}% "
+                    f"· **Freshness:** {triage.get('freshness', '')}"
+                )
+                if triage.get("recruiter_message"):
+                    lines.append(f"- **Recruiter opener:** _{triage['recruiter_message']}_")
+                if triage.get("triage_reason"):
+                    lines.append(f"- **Triage:** {triage['triage_reason']}")
             if job.get("aliases"):
                 lines.append(f"- **Also posted as:** {'; '.join(job['aliases'][:3])}")
             lines.append(f"- **Job Link:** [{link}]({link})")
@@ -389,6 +415,7 @@ class JobStore:
             "company_url", "recruiter_name", "recruiter_url", "job_url",
             "matched_skills", "missing_skills", "jd_keywords",
             "fit_breakdown", "cover_hook", "reason", "saved_at",
+            "next_action", "employer_fit", "freshness", "recruiter_message",
         ]
         with open(self.csv_file, "w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
@@ -400,4 +427,10 @@ class JobStore:
                         row[k] = "; ".join(row[k])
                 if isinstance(row.get("fit_breakdown"), dict):
                     row["fit_breakdown"] = json.dumps(row["fit_breakdown"])
+                triage = row.get("triage") or {}
+                if triage:
+                    row["next_action"] = triage.get("next_action", "")
+                    row["employer_fit"] = triage.get("employer_fit", "")
+                    row["freshness"] = triage.get("freshness", "")
+                    row["recruiter_message"] = triage.get("recruiter_message", "")
                 writer.writerow(row)

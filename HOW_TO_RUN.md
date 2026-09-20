@@ -143,9 +143,8 @@ CUDA_VISIBLE_DEVICES=0 python3 -m semif_phase1.cli \
 ---
 
 ### 7. Verify Benchmark Claims
-To run automated verification of the published benchmark metrics:
+> The published `results/` artifacts and checksums are not included in this checkout. To verify metrics, first regenerate the row-level predictions (see [`backend/benchmarks/README.md`](backend/benchmarks/README.md)), then run:
 ```bash
 cd backend
 python3 benchmarks/verify_published.py
-(cd results/raw && sha256sum -c SHA256SUMS)
 ```

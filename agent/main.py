@@ -17,6 +17,7 @@ def show_banner():
   3. 📄 View Matched Jobs Report (.md)
   4. 🔑 Login to LinkedIn (Save Browser Session)
   5. 🌐 Launch Live Web Dashboard (http://127.0.0.1:8085)
+  6. 🧠 Triage Matched Jobs (next actions + recruiter openers)
   0. 🚪 Exit
 ===============================================================
 """)
@@ -50,6 +51,11 @@ def handle_feed_scan(params: dict):
     run_hunter()
 
 
+def handle_triage():
+    from linkedin_hunter.triage import main as run_triage
+    run_triage()
+
+
 def handle_view_report():
     store = JobStore()
     md_file = store.md_file
@@ -65,7 +71,7 @@ def main():
     while True:
         try:
             show_banner()
-            choice = input("Select an option (0-5): ").strip()
+            choice = input("Select an option (0-6): ").strip()
 
             if choice == "1":
                 q = input("Job Title [default: 'UI/UX Designer']: ").strip() or "UI/UX Designer"
@@ -82,11 +88,13 @@ def main():
                 run_login()
             elif choice == "5":
                 run_web()
+            elif choice == "6":
+                handle_triage()
             elif choice == "0":
                 print("\nGoodbye! 👋\n")
                 break
             else:
-                print("[!] Invalid option. Please choose 0 to 5.")
+                print("[!] Invalid option. Please choose 0 to 6.")
         except (KeyboardInterrupt, EOFError):
             print("\nGoodbye! 👋\n")
             break

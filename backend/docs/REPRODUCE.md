@@ -58,9 +58,9 @@ TypeSafe source records are not included. To reproduce that comparison, supply l
 python benchmarks/fetch_sources.py --output /path/on/large-drive/semif-sources
 ```
 
-The frozen 706-row matrix and source IDs are in `benchmarks/manifests/`. Row-level direct and reranker outputs are in `results/raw/predictions/`. The complete owned 144-row labeled workload is distributed in `benchmarks/data/authored144.jsonl`.
+The frozen 706-row matrix and source IDs are in `benchmarks/manifests/`. The complete owned 144-row labeled workload is distributed in `benchmarks/data/authored144.jsonl`.
 
-Build the exact external evaluation rows and recompute their metrics with the commands in [the benchmark guide](../benchmarks/README.md#quality-evidence). The builders verify source hashes and frozen selection IDs; the TypeSafe and Every evaluators accept the rebuilt gold rows plus the committed row-level predictions.
+Build the exact external evaluation rows and recompute their metrics with the commands in [the benchmark guide](../benchmarks/README.md#quality-evidence). The builders verify source hashes and frozen selection IDs; the TypeSafe and Every evaluators accept the rebuilt gold rows plus the row-level predictions regenerated below.
 
 ## Reproduce perturbation evidence
 
@@ -74,18 +74,17 @@ python benchmarks/build_perturbations.py \
 cmp /tmp/perturbations108.jsonl benchmarks/data/perturbations108.jsonl
 ```
 
-Regenerate direct and reranker predictions with `semif-score --mode serial` and `--mode reranker`, respectively, or recompute the exact committed report from the included row-level predictions:
+Regenerate direct and reranker predictions with `semif-score --mode serial` and `--mode reranker` (see the benchmark guide), then recompute the report:
 
 ```bash
 python benchmarks/evaluate_perturbations.py \
   --gold benchmarks/data/authored144.jsonl \
   --perturbations benchmarks/data/perturbations108.jsonl \
-  --direct-base results/raw/predictions/direct-authored144.jsonl \
-  --direct-perturbations results/raw/predictions/direct-perturbations108.jsonl \
-  --reranker-base results/raw/predictions/reranker-authored144.jsonl \
-  --reranker-perturbations results/raw/predictions/reranker-perturbations108.jsonl \
+  --direct-base direct-authored144.jsonl \
+  --direct-perturbations direct-perturbations108.jsonl \
+  --reranker-base reranker-authored144.jsonl \
+  --reranker-perturbations reranker-perturbations108.jsonl \
   --output perturbation-report.json
-cmp perturbation-report.json results/raw/perturbation-comparison.json
 ```
 
 ## Reproduce the headline speed results
@@ -123,11 +122,4 @@ CUDA_VISIBLE_DEVICES=0 python benchmarks/shape777_reranker.py \
 
 All scripts require a new output path. Timing includes prompt construction, tokenization, transfers, model execution, and CPU readout after a warmup; model loading and final result-file writes are excluded.
 
-Verify the committed evidence bundle and confirm that every selected scalar in the machine-readable summary matches its raw report:
-
-```bash
-(cd results/raw && sha256sum -c SHA256SUMS)
-python benchmarks/verify_published.py
-```
-
-The source-specific quality commands above regenerate the metrics stored in `results/raw/quality-comparison.json`. `verify_published.py` checks 69 published summary values against that report plus the perturbation, systems, and generation reports. It deliberately does not require byte-identical GPU reruns.
+The published evidence bundle (raw results, checksums, and machine-readable summary) is not included in this checkout. After regenerating the reports above, `benchmarks/verify_published.py` checks the published summary values against them; it deliberately does not require byte-identical GPU reruns.

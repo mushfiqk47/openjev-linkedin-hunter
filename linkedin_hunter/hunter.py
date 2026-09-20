@@ -117,7 +117,12 @@ def main():
         "--daily-cap",
         type=int,
         default=80,
-        help="Max LLM evaluations per run (safety cap, default: 80)",
+        help="Max LLM evaluations per run (soft cap; only enforced with --enforce-caps)",
+    )
+    parser.add_argument(
+        "--enforce-caps",
+        action="store_true",
+        help="Restore the old early-stop at --daily-cap/--limit (default: exhaustive triage of every page and feed post)",
     )
     parser.add_argument(
         "--headless",
@@ -164,6 +169,7 @@ def main():
         save_on_linkedin=args.save_on_linkedin, easy_apply=args.easy_apply,
         explore_feed=True, feed_only=args.feed_only,
         max_feed_scrolls=args.max_feed_scrolls, criteria=getattr(args, "criteria", None),
+        enforce_caps=args.enforce_caps,
     )
 
     def _log(msg: str, level: str = "info"):
@@ -185,6 +191,7 @@ def main():
         print("\n" + "=" * 68)
         print("🎉 Hunt Complete!")
         print(f"   Evaluated:       {result.evaluated} postings & feed updates")
+        print(f"   Filtered out:    {result.skipped} (each with a recorded reason)")
         print(f"   Matched Target:  {result.matched} / {params.min_matches} opportunities saved")
         print(f"   Report:          {store.md_file}")
         print(f"   Data:            {store.json_file}")

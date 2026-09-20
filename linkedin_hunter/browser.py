@@ -10,7 +10,7 @@ from .config import (
     HUMAN_DELAY_MIN, HUMAN_DELAY_MAX,
     CARD_CLICK_DELAY_MIN, CARD_CLICK_DELAY_MAX,
 )
-from .storage import is_job_seen, save_seen_job, normalize_signature, jd_hash
+from .storage import is_job_seen, record_skip_reason, save_seen_job, jd_hash
 
 
 def human_pause(lo: float = HUMAN_DELAY_MIN, hi: float = HUMAN_DELAY_MAX):
@@ -510,8 +510,14 @@ class LinkedInBrowser:
         criteria: list[str] | None = None,
         on_status_update=None,
         stop_check=None,
+        exhaustive: bool = False,
     ) -> int:
-        """Navigates to LinkedIn feed, scrolls continuously, checks posts against candidate CV, and saves qualifying leads until target matches are reached."""
+        """Navigates to LinkedIn feed, scrolls continuously, checks posts against candidate CV, and saves qualifying leads.
+
+        With ``exhaustive`` (feature 2) the scan no longer stops at the target
+        match count: every visible post is evaluated and every non-match records a
+        one-line reason, bounded only by ``max_scrolls`` / the stop flag.
+        """
         print("\n" + "=" * 65)
         print(f"📰 Navigating to LinkedIn News Feed to scan posts for hiring leads...")
         print(f"   🎯 Goal: Find at least {target_matches} matching opportunities (Current: {current_matched})")
@@ -527,11 +533,14 @@ class LinkedInBrowser:
         matched_count = current_matched
         consecutive_idle_scrolls = 0
 
+        def target_reached() -> bool:
+            return (not exhaustive) and matched_count >= target_matches
+
         for scroll_idx in range(max_scrolls):
             if stop_check and stop_check():
                 print("[⏹] Stop signal received. Halting feed search.")
                 break
-            if matched_count >= target_matches:
+            if target_reached():
                 print(f"\n🎯 Target goal reached! Found {matched_count}/{target_matches} matches.")
                 break
 
@@ -605,7 +614,7 @@ class LinkedInBrowser:
                 if stop_check and stop_check():
                     print("[⏹] Stop signal received. Halting feed post processing.")
                     break
-                if matched_count >= target_matches:
+                if target_reached():
                     break
 
                 text = post.get("text", "").strip()
@@ -676,11 +685,15 @@ class LinkedInBrowser:
                     if view_profiles and author_url:
                         self.view_profile(author_url, label=f"Post Author: {author}")
 
-                    if matched_count >= target_matches:
+                    if target_reached():
                         print(f"\n🎯 Target reached via feed posts! ({matched_count} matches)")
                         break
+                else:
+                    reason = eval_res.get("skip_reason") or "Below feed threshold."
+                    record_skip_reason(f"feed_{abs(hash(sig))}", reason, seen_state)
+                    print(f"    [·] Not saved ({score}%) \u2014 {reason}")
 
-            if matched_count >= target_matches:
+            if target_reached():
                 break
 
             if new_unseen_in_batch == 0:

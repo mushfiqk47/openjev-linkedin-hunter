@@ -6,15 +6,9 @@
 
 *Independent project; not affiliated with Jev or TypeSafe.*
 
-[![Measured replay: typed decisions appear together while JSON streams token by token](demo/assets/semif-phase1-replay.gif)](demo/index.html)
-
-*Same frozen 4B model · same state · same 21 questions · measured separately, aligned at t=0 in the replay*
-
 </div>
 
 > **Independent research project.** SemIf was formerly called OpenJev. It is not affiliated with or endorsed by TypeSafe. Jev, TypeSafe, and other names and marks are the property of their respective owners. No infringement is intended.
-
-![SemIf runs locally or through a hosted model](assets/semif-no-waitlist.png)
 
 Most agent decisions are small: *route this*, *retry that*, *does the evidence support X?* A chat model can answer them, but it spends time generating text that software immediately parses back into an `if` statement.
 
@@ -96,7 +90,7 @@ Same frozen Qwen3.5-4B, same owned state, same 21 binary criteria, one RTX 3090:
 | Direct typed logits, median of 3 | **1.023 s** | **0** | 21 probability pairs |
 | Autoregressive JSON array, median of 3 | 5.332 s | 111 | Valid ordered 21-value array |
 
-The compact generative baseline emits only ordered `"yes"`/`"no"` values—no keys, confidence objects, or explanations. Its median first-token time was 0.489 s, but completing the array took **5.21×** as long as direct readout. All three arrays were valid and identical. Their choices agreed with direct argmax on 18/21 criteria, so this is a systems comparison rather than a claim that the two readouts are semantically equivalent. [Exact prompt, outputs, token timeline, and runs](results/raw/decision-vs-compact-array.json) are committed.
+The compact generative baseline emits only ordered `"yes"`/`"no"` values—no keys, confidence objects, or explanations. Its median first-token time was 0.489 s, but completing the array took **5.21×** as long as direct readout. All three arrays were valid and identical. Their choices agreed with direct argmax on 18/21 criteria, so this is a systems comparison rather than a claim that the two readouts are semantically equivalent. The exact prompt, outputs, token timeline, and runs were part of this project's published artifacts.
 
 ### Reusing a state across 21 decisions
 
@@ -109,7 +103,7 @@ On an owned 37-state × 21-criterion workload:
 | Parallel suffixes | **20.03** | **38.8 s** |
 | Native reranker | 1.86 | 417.3 s |
 
-The owned [37×21 fixture](benchmarks/data/shape777.jsonl), [direct/reuse runner](benchmarks/shape777.py), [reranker runner](benchmarks/shape777_reranker.py), [raw timings](results/raw/shape777-direct.json), and [row-level predictions](results/raw/shape777-direct.predictions.jsonl) are included. The fast reuse paths are experimental: BF16 execution changed 5–6 of 777 argmaxes relative to fresh scoring.
+The owned [37×21 fixture](benchmarks/data/shape777.jsonl), [direct/reuse runner](benchmarks/shape777.py), and [reranker runner](benchmarks/shape777_reranker.py) are included; the raw timings and row-level predictions were part of this project's published artifacts. The fast reuse paths are experimental: BF16 execution changed 5–6 of 777 argmaxes relative to fresh scoring.
 
 ## Quality
 
@@ -165,11 +159,7 @@ Returned probabilities are conditional on the supplied options. Calibrate and va
 - [Hosted models](docs/REMOTE.md) — LM Studio and other OpenAI-compatible servers
 - [TypeSafe (Jev) proxy](docs/TYPESAFE_PROXY.md) — `semif-proxy` local API-key gateway
 - [Jev choice server](docs/JEV_SERVER.md) — `semif-jevsrv`, a TypeSafe-shaped choice endpoint backed by a hosted model
-- [Interactive replay](demo/index.html)
-- [Machine-readable summary](results/phase1-summary.json)
-- [Benchmark bundle](benchmarks/README.md) — fixtures, runners, selection IDs, and reproduction commands
-- [Raw results and checksums](results/raw/)
-- [Third-party sources](THIRD_PARTY.md)
+- [Benchmark bundle](benchmarks/README.md) — fixtures, runners, and selection IDs
 
 ## Star history
 

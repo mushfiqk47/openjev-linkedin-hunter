@@ -14,8 +14,7 @@ import json
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
-from .config import BASE_DIR, OUTPUT_DIR, DEFAULT_MIN_MATCHES
+from .config import DEFAULT_MIN_MATCHES
 from .storage import JobStore, load_seen_state
 from .evaluator import JobEvaluator
 from .browser import LinkedInBrowser
@@ -1250,6 +1249,7 @@ def run_background_hunt(params: dict):
             feed_only=bool(params.get("feed_only", False)),
             max_feed_scrolls=int(params.get("max_feed_scrolls", 80)),
             criteria=params.get("criteria"),
+            enforce_caps=bool(params.get("enforce_caps", False)),
         )
         log_agent(f"Target goal: find {hunt_params.target_matches} matching opportunities.", "info")
         if hunt_params.feed_only:
@@ -1277,9 +1277,9 @@ def run_background_hunt(params: dict):
 
             browser.close()
             if AGENT_STOP_FLAG.is_set():
-                log_agent(f"Agent stopped. Processed {result.evaluated} jobs, saved {result.matched} matches.", "warning")
+                log_agent(f"Agent stopped. Processed {result.evaluated} jobs, filtered {result.skipped}, saved {result.matched} matches.", "warning")
             else:
-                log_agent(f"✓ Hunt complete! Successfully saved {result.matched} matching opportunities.", "success")
+                log_agent(f"✓ Hunt complete! Evaluated {result.evaluated}, filtered {result.skipped}, saved {result.matched}.", "success")
 
         except Exception as e:
             log_agent(f"Error executing hunter agent: {e}", "error")
