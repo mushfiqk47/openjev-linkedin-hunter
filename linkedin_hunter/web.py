@@ -15,8 +15,8 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from .config import BASE_DIR, OUTPUT_DIR, DEFAULT_QUERIES, DEFAULT_MIN_MATCHES
-from .storage import JobStore, load_seen_state, save_searched_query
+from .config import BASE_DIR, OUTPUT_DIR, DEFAULT_MIN_MATCHES
+from .storage import JobStore, load_seen_state
 from .evaluator import JobEvaluator
 from .browser import LinkedInBrowser
 
@@ -1224,34 +1224,38 @@ class DashboardHandler(BaseHTTPRequestHandler):
 
 
 def run_background_hunt(params: dict):
+    """Web Adapter over the same hunt_core seam as the CLI (no duplicated hunting logic)."""
+    from .hunt_core import HuntDeps, HuntHooks, HuntParams, run_hunt
+
     with AGENT_LOCK:
         AGENT_STOP_FLAG.clear()
         AGENT_STATE["running"] = True
         AGENT_STATE["agent"] = "LinkedIn Job Hunter Agent"
 
-        target_matches = int(params.get("target_matches", DEFAULT_MIN_MATCHES))
-        feed_only = bool(params.get("feed_only", False))
-        auto_rotate = bool(params.get("auto_rotate", True))
-        view_profiles = bool(params.get("view_profiles", True))
-        explore_feed = bool(params.get("explore_feed", True))
-        easy_apply = bool(params.get("easy_apply", False))
-        criteria = params.get("criteria")
-        initial_query = params.get("query", "UI/UX Designer")
-        location = params.get("location", "")
-        recency = params.get("recency", "week")
-        work_type = params.get("work_type", "all")
-
-        queries = [initial_query]
-        if auto_rotate:
-            for q in DEFAULT_QUERIES:
-                if q.lower() != initial_query.lower():
-                    queries.append(q)
-
-        log_agent(f"Target goal: find {target_matches} matching opportunities.", "info")
-        if feed_only:
+        hunt_params = HuntParams(
+            query=params.get("query", "UI/UX Designer"),
+            location=params.get("location", ""),
+            recency=params.get("recency", "week"),
+            work_type=params.get("work_type", "all"),
+            target_matches=int(params.get("target_matches", DEFAULT_MIN_MATCHES)),
+            min_score=int(params.get("min_score", 70)),
+            max_pages=int(params.get("max_pages", 2)),
+            limit=int(params.get("limit", 30)),
+            daily_cap=int(params.get("daily_cap", 80)),
+            auto_rotate=bool(params.get("auto_rotate", True)),
+            view_profiles=bool(params.get("view_profiles", True)),
+            save_on_linkedin=bool(params.get("save_on_linkedin", False)),
+            easy_apply=bool(params.get("easy_apply", False)),
+            explore_feed=bool(params.get("explore_feed", True)),
+            feed_only=bool(params.get("feed_only", False)),
+            max_feed_scrolls=int(params.get("max_feed_scrolls", 80)),
+            criteria=params.get("criteria"),
+        )
+        log_agent(f"Target goal: find {hunt_params.target_matches} matching opportunities.", "info")
+        if hunt_params.feed_only:
             log_agent("Mode: DIRECT FEED SCAN (Scanning candidate LinkedIn News Feed directly).", "info")
         else:
-            log_agent(f"Initial query: '{initial_query}' | Work Type: '{work_type}' | Recency: '{recency}'", "info")
+            log_agent(f"Initial query: '{hunt_params.query}' | Work Type: '{hunt_params.work_type}' | Recency: '{hunt_params.recency}'", "info")
 
         try:
             evaluator = JobEvaluator()
@@ -1262,109 +1266,20 @@ def run_background_hunt(params: dict):
             browser.start()
             log_agent("✓ Browser connected.", "success")
 
-            matched_count = 0
-            evaluated_count = 0
-
-            if feed_only:
-                # Direct Feed Scan
-                log_agent(f"📰 Navigating to LinkedIn News Feed to scan posts (Goal: {target_matches} matches)...", "info")
-                matched_count = browser.browse_feed_and_find_matches(
-                    evaluator=evaluator,
-                    store=STORE,
-                    seen_state=seen_state,
-                    target_matches=target_matches,
-                    current_matched=matched_count,
-                    max_scrolls=80,
-                    view_profiles=view_profiles,
-                    criteria=criteria,
-                    on_status_update=lambda s: log_agent(s, "info"),
-                    stop_check=lambda: AGENT_STOP_FLAG.is_set(),
-                )
-            else:
-                # 1. Search job posts across rotated queries
-                for q_idx, q in enumerate(queries):
-                    if AGENT_STOP_FLAG.is_set():
-                        log_agent("⏹ Stop requested. Exiting query search loop.", "warning")
-                        break
-                    if matched_count >= target_matches:
-                        break
-
-                    q_norm = q.strip().lower()
-                    if q_norm in seen_state["searched_queries"] and q_idx > 0:
-                        log_agent(f"↻ Skipping previously searched query: '{q}'", "info")
-                        continue
-                    save_searched_query(q, seen_state)
-
-                    log_agent(f"Searching LinkedIn [{q_idx + 1}/{len(queries)}]: '{q}'", "info")
-
-                    for raw_job in browser.search_jobs(
-                        keywords=q,
-                        location=location,
-                        recency=recency,
-                        work_type=work_type,
-                        limit=30,
-                        max_pages=2,
-                        seen_state=seen_state,
-                        view_profiles=view_profiles,
-                        stop_check=lambda: AGENT_STOP_FLAG.is_set(),
-                        easy_apply=easy_apply,
-                    ):
-                        if AGENT_STOP_FLAG.is_set():
-                            log_agent("⏹ Stop flag detected during card evaluation.", "warning")
-                            break
-
-                        evaluated_count += 1
-                        if evaluated_count > 80:
-                            log_agent("Daily cap 80 evaluations reached — stopping.", "warning")
-                            break
-                        eval_res = evaluator.evaluate(
-                            raw_job["title"],
-                            raw_job["company"],
-                            raw_job["description"],
-                            criteria=criteria,
-                        )
-                        score = eval_res.get("match_score", 0)
-                        low = " [low-margin]" if eval_res.get("low_margin") else ""
-                        if eval_res.get("prescreen"):
-                            log_agent(f"Pre-screen filtered: {raw_job['title']} @ {raw_job['company']}", "info")
-                            continue
-
-                        if score >= 70:
-                            matched_count += 1
-                            STORE.save_job({**raw_job, **eval_res})
-                            log_agent(f"★ Match {matched_count}/{target_matches}: {raw_job['title']} @ {raw_job['company']} ({score}%){low}", "match")
-                        else:
-                            log_agent(f"Filtered out: {raw_job['title']} @ {raw_job['company']} ({score}%)", "info")
-
-                        if matched_count >= target_matches:
-                            log_agent(f"✓ Target goal of {target_matches} matches achieved from job search!", "success")
-                            break
-
-                    if matched_count >= target_matches:
-                        break
-
-            # 2. Fallback to LinkedIn News Feed if search pages didn't reach target
-            if not AGENT_STOP_FLAG.is_set() and explore_feed and matched_count < target_matches:
-                log_agent(f"Job search reached {matched_count}/{target_matches} matches. Transitioning to LinkedIn News Feed to find remaining {target_matches - matched_count} matches...", "warning")
-                log_agent(f"Scrolling feed continuously until {target_matches} target matches are found...", "info")
-                matched_count = browser.browse_feed_and_find_matches(
-                    evaluator=evaluator,
-                    store=STORE,
-                    seen_state=seen_state,
-                    target_matches=target_matches,
-                    current_matched=matched_count,
-                    max_scrolls=80,
-                    view_profiles=view_profiles,
-                    criteria=criteria,
-                    on_status_update=lambda s: log_agent(s, "info"),
-                    stop_check=lambda: AGENT_STOP_FLAG.is_set(),
-                )
+            deps = HuntDeps(
+                evaluator=evaluator, store=STORE, seen_state=seen_state,
+                search_jobs=browser.search_jobs,
+                browse_feed=browser.browse_feed_and_find_matches,
+            )
+            hooks = HuntHooks(
+                on_event=log_agent, should_stop=lambda: AGENT_STOP_FLAG.is_set())
+            result = run_hunt(hunt_params, deps, hooks)
 
             browser.close()
             if AGENT_STOP_FLAG.is_set():
-                log_agent(f"Agent stopped. Processed {evaluated_count} jobs, saved {matched_count} matches.", "warning")
+                log_agent(f"Agent stopped. Processed {result.evaluated} jobs, saved {result.matched} matches.", "warning")
             else:
-                log_agent(f"✓ Hunt complete! Successfully saved {matched_count} matching opportunities.", "success")
+                log_agent(f"✓ Hunt complete! Successfully saved {result.matched} matching opportunities.", "success")
 
         except Exception as e:
             log_agent(f"Error executing hunter agent: {e}", "error")

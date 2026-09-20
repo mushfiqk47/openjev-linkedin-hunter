@@ -1,22 +1,17 @@
-"""Main CLI entrypoint for LinkedIn Job Hunter."""
+"""Main CLI entrypoint for LinkedIn Job Hunter (thin Adapter over hunt_core)."""
 
 import argparse
 import sys
 from .config import (
-    DEFAULT_QUERIES,
     DEFAULT_MIN_SCORE,
     DEFAULT_MIN_MATCHES,
     DEFAULT_MAX_PAGES_PER_QUERY,
-    DEFAULT_JOB_LIMIT,
 )
 from .cv_loader import load_cv_data
 from .evaluator import JobEvaluator
 from .browser import LinkedInBrowser
-from .storage import (
-    JobStore,
-    load_seen_state,
-    save_searched_query,
-)
+from .hunt_core import HuntDeps, HuntHooks, HuntParams, run_hunt
+from .storage import JobStore, load_seen_state
 
 
 def main():
@@ -160,137 +155,37 @@ def main():
     print(f"[✓] Connected to local evaluator (LM Studio: {evaluator.model})")
     print(f"[✓] Memory: {len(seen_state['seen_ids'])} job IDs, {len(seen_state['seen_signatures'])} signatures, {len(seen_state['searched_queries'])} queries recorded")
 
-    # 3. Build query rotation queue
-    queries = [args.query]
-    if args.rotate_queries:
-        for q in DEFAULT_QUERIES:
-            if q.lower() != args.query.lower():
-                queries.append(q)
+    # 3. Thin Adapter: argparse -> HuntParams, print hooks -> HuntHooks
+    params = HuntParams(
+        query=args.query, location=args.location, recency=args.recency,
+        work_type=args.work_type, min_matches=args.min_matches, min_score=args.min_score,
+        max_pages=args.max_pages, limit=args.limit, daily_cap=args.daily_cap,
+        auto_rotate=args.rotate_queries, view_profiles=args.view_profiles,
+        save_on_linkedin=args.save_on_linkedin, easy_apply=args.easy_apply,
+        explore_feed=True, feed_only=args.feed_only,
+        max_feed_scrolls=args.max_feed_scrolls, criteria=getattr(args, "criteria", None),
+    )
 
-    # 4. Start Browser
+    def _log(msg: str, level: str = "info"):
+        tag = {"match": "[★]", "success": "[✓]", "warning": "[!]"}.get(level, "[i]")
+        print(f"  {tag} {msg}")
+
+    # 4. Start Browser (injected dependency, not created inside the Module)
     browser = LinkedInBrowser(headless=args.headless)
-    matched_count = 0
-    evaluated_count = 0
 
     try:
         browser.start()
-        print(f"\n[*] Hunting for at least {args.min_matches} matching job posts...")
-
-        if args.feed_only:
-            # DIRECT FEED MODE
-            print(f"\n[📰] Direct Feed Mode: Navigating straight to LinkedIn News Feed...")
-            matched_count = browser.browse_feed_and_find_matches(
-                evaluator=evaluator,
-                store=store,
-                seen_state=seen_state,
-                target_matches=args.min_matches,
-                current_matched=matched_count,
-                max_scrolls=args.max_feed_scrolls,
-                view_profiles=args.view_profiles,
-                criteria=getattr(args, "criteria", None),
-            )
-        else:
-            # STEP 1: Search Job Pages across rotated queries
-            for q_idx, current_query in enumerate(queries):
-                if matched_count >= args.min_matches or evaluated_count >= args.limit:
-                    break
-
-                # Prevent searching the exact same query repeatedly
-                q_norm = current_query.strip().lower()
-                if q_norm in seen_state["searched_queries"] and q_idx > 0:
-                    print(f"\n[↻] Query '{current_query}' was already searched in previous runs — skipping to avoid duplicates.")
-                    continue
-                save_searched_query(current_query, seen_state)
-
-                print(f"\n" + "-" * 60)
-                print(f"🔎 Query {q_idx + 1}/{len(queries)}: '{current_query}'")
-                print(f"   Matches so far: {matched_count} / {args.min_matches}")
-                print("-" * 60)
-
-                for raw_job in browser.search_jobs(
-                    keywords=current_query,
-                    location=args.location,
-                    recency=args.recency,
-                    work_type=args.work_type,
-                    limit=min(args.limit - evaluated_count, args.daily_cap - evaluated_count),
-                    max_pages=args.max_pages,
-                    seen_state=seen_state,
-                    save_on_linkedin=args.save_on_linkedin,
-                    view_profiles=args.view_profiles,
-                    easy_apply=args.easy_apply,
-                ):
-                    if evaluated_count >= args.daily_cap:
-                        print(f"  [!] Daily cap {args.daily_cap} reached — stopping evaluations.")
-                        break
-                    evaluated_count += 1
-                    job_id = raw_job["job_id"]
-                    title = raw_job["title"]
-                    company = raw_job["company"]
-
-                    print(f"\n[{evaluated_count}] Evaluating: {title} @ {company}...")
-
-                    # Run SemIf logprob decision evaluation
-                    eval_res = evaluator.evaluate(
-                        job_title=title,
-                        company=company,
-                        job_description=raw_job["description"],
-                        criteria=getattr(args, "criteria", None),
-                    )
-
-                    score = eval_res["match_score"]
-                    fit = eval_res["fit_level"]
-                    reason = eval_res["reason"]
-                    extra = ""
-                    if eval_res.get("low_margin"):
-                        extra = " [low-margin — review manually]"
-                    if eval_res.get("prescreen"):
-                        extra = " [prescreen]"
-
-                    badge = "🟢" if score >= 80 else ("🟡" if score >= 65 else "⚪")
-                    print(f"    {badge} Fit Score: {score}% ({fit}){extra}")
-                    print(f"    ↳ {reason}")
-                    if eval_res.get("jd_keywords"):
-                        print(f"    ↳ keywords: {', '.join(eval_res['jd_keywords'][:6])}")
-
-                    # If score meets threshold, save to report
-                    if score >= args.min_score:
-                        matched_count += 1
-                        job_record = {
-                            **raw_job,
-                            **eval_res,
-                        }
-                        store.save_job(job_record)
-                        print(f"    [★ MATCH {matched_count}/{args.min_matches}] Saved to {store.md_file.name}!")
-
-                        if matched_count >= args.min_matches:
-                            print(f"\n🎯 Target reached! Found {matched_count} matching job posts.")
-                            break
-
-                if matched_count >= args.min_matches:
-                    break
-
-            # STEP 2: Fallback to LinkedIn Feed if target matches not reached
-            if matched_count < args.min_matches:
-                print(f"\n" + "=" * 68)
-                print(f"[*] Found {matched_count}/{args.min_matches} matches from job search pages.")
-                print(f"[*] Seamlessly transitioning to LinkedIn News Feed...")
-                print(f"[*] Scrolling feed until all {args.min_matches} required matches are found!")
-                print("=" * 68)
-                matched_count = browser.browse_feed_and_find_matches(
-                    evaluator=evaluator,
-                    store=store,
-                    seen_state=seen_state,
-                    target_matches=args.min_matches,
-                    current_matched=matched_count,
-                    max_scrolls=args.max_feed_scrolls,
-                    view_profiles=args.view_profiles,
-                    criteria=getattr(args, "criteria", None),
-                )
+        print(f"\n[*] Hunting for at least {params.min_matches} matching job posts...")
+        deps = HuntDeps(
+            evaluator=evaluator, store=store, seen_state=seen_state,
+            search_jobs=browser.search_jobs, browse_feed=browser.browse_feed_and_find_matches,
+        )
+        result = run_hunt(params, deps, HuntHooks(on_event=_log))
 
         print("\n" + "=" * 68)
         print("🎉 Hunt Complete!")
-        print(f"   Evaluated:       {evaluated_count} postings & feed updates")
-        print(f"   Matched Target:  {matched_count} / {args.min_matches} opportunities saved")
+        print(f"   Evaluated:       {result.evaluated} postings & feed updates")
+        print(f"   Matched Target:  {result.matched} / {params.min_matches} opportunities saved")
         print(f"   Report:          {store.md_file}")
         print(f"   Data:            {store.json_file}")
         print("=" * 68 + "\n")

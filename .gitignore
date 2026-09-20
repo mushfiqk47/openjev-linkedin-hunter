@@ -40,6 +40,8 @@ linkedin_hunter/.chrome_profile/
 # Environment variables & secrets
 .env
 *.env.local
+backend/.env
+linkedin_hunter/.env
 
 # Large archives
 *.zip
@@ -65,3 +67,19 @@ htmlcov/
 
 # Logs
 *.log
+
+# Local backups / merge artifacts (never commit these)
+*.bak
+*.orig
+*.rej
+linkedin_hunter/output/*.bak
+
+# Playwright / browser test artifacts
+playwright-report/
+test-results/
+.trace.zip
+
+# Local data stores (SQLite future, caches)
+*.db
+*.sqlite3
+.cache/

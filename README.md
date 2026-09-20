@@ -30,12 +30,16 @@ jev-api/
 │   │   └── typesafe_proxy.py      # TypeSafe reverse proxy with client auth
 │   └── tests/                     # Test suite for SemIf decision scoring
 ├── linkedin_hunter/               # Autonomous LinkedIn Browser Agent
-│   ├── browser.py                 # Playwright CDP automation & feed scraper
-│   ├── evaluator.py               # SemIf logprob evaluator for jobs & feed posts
-│   ├── hunter.py                  # Goal-driven CLI agent (query rotation, feed fallback)
-│   ├── storage.py                 # Persistent JSON deduplication & report generator
+│   ├── browser.py                 # Playwright CDP automation & feed scraper (extract-first, jittered pacing)
+│   ├── hunt_core.py               # Deep hunting module: single run_hunt() seam for CLI + Web
+│   ├── evaluator.py               # Calibrated SemIf evaluator (BM25 prescreen, factor breakdown)
+│   ├── hunter.py                  # Thin CLI adapter over hunt_core (argparse → HuntParams)
+│   ├── storage.py                 # JD-hash dedup, enriched reports (Top 3, priorities, hooks)
+│   ├── config.py                  # Queries, filters, thresholds, skill vocabulary, timing
+│   ├── cv_loader.py               # CV JSON → prompt profile
+│   ├── login.py                   # One-time LinkedIn session login helper
 │   ├── web.py                     # Analogue Web Dashboard & UI Agent Launcher (:8085)
-│   ├── seen_jobs.json             # Persistent deduplication database
+│   ├── seen_jobs.json             # Persistent deduplication database (IDs, signatures, JD hashes)
 │   └── output/
 │       ├── jobs_report.md         # Generated markdown report with recruiter links
 │       ├── jobs.csv               # CSV export of matched opportunities
@@ -52,6 +56,9 @@ jev-api/
 
 ### 1. Zero-Hallucination Decision Scoring (SemIf)
 - **Sub-300ms Forward Pass:** Evaluates fit by calculating native token logits on LM Studio (`qwen3.5-4b`) with `reasoning_effort="none"`.
+- **BM25 Prescreen (zero LLM cost):** Disqualified titles and no-design-signal posts filter to `SKIP` before any model call.
+- **Calibrated Scores:** Raw logprob percentages are monotonically compressed (cap 94) to counter instruct-model overconfidence; `raw_score` is preserved and `low_margin` flags borderline cases for manual review.
+- **Factor Breakdown + Real Gaps:** Each evaluation returns `role/tools/level/domain` fits, JD keywords extracted against a skill vocabulary, matched vs missing skills, employment type, and a cover-letter hook.
 - **CV Profile Alignment:** Compares candidate skills, experience level, tools (Figma, Design Systems), and dealbreakers against job descriptions and feed post content.
 
 ### 2. Autonomous LinkedIn Hunter
@@ -61,17 +68,20 @@ jev-api/
   2. **Direct Feed Scan (`--feed-only`):** Navigates directly to `https://www.linkedin.com/feed/` to discover organic hiring posts from your network.
 - **Multi-Target Feed Scroller:** Targets `<main id="workspace">` / `.scaffold-layout__main` with `PageDown` key events, scrolling reliably across modern dynamic LinkedIn layouts.
 - **Text Expansion (`… more`):** Automatically clicks collapsed `… more` buttons on feed updates so complete job descriptions, emails, and criteria are exposed to SemIf.
-- **Instant Persistent Deduplication:** Signature hashing (`{title} @@ {company}`) in `seen_jobs.json` avoids re-evaluating previously seen postings.
+- **Instant Persistent Deduplication:** ID + `{title} @@ {company}` signature + JD-body hash in `seen_jobs.json` avoids re-evaluating previously seen postings (including identical JDs reposted under different posters, merged as aliases).
+- **Easy Apply Filter:** Optional `f_AL=true` + recent-first sorting (`--easy-apply` / dashboard checkbox).
+- **Extract-First Scraping:** Card metadata is snapshotted via a single JS pass before visiting details — no detached-element failures; role-based waits replace fixed sleeps.
 - **Hiring Lead Inspection:** Automatically identifies hiring managers / recruiters (`/in/<username>`) and company profiles (`/company/<name>`).
+- **One Hunting Core:** `hunt_core.run_hunt()` is the single seam behind both CLI and Web (query rotation, caps, feed fallback); both entrypoints are thin adapters, and fakes make it testable without LM Studio or Playwright.
 
 ### 3. Analogue Web Dashboard (`http://127.0.0.1:8085`)
-- **Interactive Agent Controls:** Full form controls for query, recency, work type, target matches, query rotation, profile inspection, feed fallback, and fit criteria.
+- **Interactive Agent Controls:** Full form controls for query, recency, work type, target matches, query rotation, profile inspection, feed fallback, Easy Apply, and fit criteria.
 - **Direct Agent Triggers:** Dedicated `▶ Search Jobs` and `📰 Scan Feed` buttons.
 - **Live Terminal Console:** Real-time auto-scrolling terminal log with color-coded severity tags (`[INFO]`, `[MATCH]`, `[WARNING]`, `[SUCCESS]`).
 - **Graceful Stop Button:** Halts browser navigation safely at any point (`■ Stop Agent`).
 - **Segmented Report Viewer:**
-  - **Cards View:** Interactive cards with match percentages, fit tags, and LinkedIn apply links.
-  - **Full Report (.md View):** Formatted Markdown view with summary tables, candidate breakdown, and recruiter links.
+  - **Cards View:** Interactive cards with match percentages, priority/employment-type/deadline tags, factor breakdowns, JD keywords to mirror in your resume, gaps, and copyable cover openers.
+  - **Full Report (.md View):** `Top 3 Apply Now` + summary table + detailed breakdowns + separate Network Leads section.
   - **Raw Markdown View:** Monospaced view with one-click clipboard copy and `.md` / `.csv` export links.
 
 ---
@@ -155,6 +165,9 @@ Run the browser hunter with custom parameters:
 | `--limit` | `--max-eval` | `120` | Safety ceiling of total raw jobs to evaluate across queries |
 | `--max-feed-scrolls` | | `80` | Safety ceiling of scrolls on the LinkedIn feed |
 | `--feed-only` | | `False` | Scan LinkedIn News Feed directly without searching job posts first |
+| `--easy-apply` | | `False` | Only Easy Apply jobs (`f_AL=true`, recent-first) |
+| `--criteria` | | `None` | Custom SemIf criteria lines (overrides defaults) |
+| `--daily-cap` | | `80` | Max LLM evaluations per run (safety cap) |
 | `--rotate-queries` | | `True` | Automatically rotate related queries if under target |
 | `--view-profiles` | | `True` | Visit recruiter and company profiles to gather details |
 | `--save-on-linkedin` | | `False` | Also click "Save" bookmark button on LinkedIn |
@@ -185,6 +198,7 @@ The dashboard server exposes clean JSON REST endpoints:
 |---|---|---|
 | `/` | `GET` | Analogue web dashboard interface |
 | `/api/jobs` | `GET` | List of all matched opportunities and scoring details |
+| `/api/stats` | `GET` | Dedup/eval stats (`seen_ids`, `seen_jd_hashes`, `skip_reasons`, `matched`) |
 | `/api/agent/status` | `GET` | Active agent status (`running`, `agent`, live log buffer) |
 | `/api/agent/launch` | `POST` | Launch LinkedIn Hunter or Feed agent with parameters |
 | `/api/agent/stop` | `POST` | Send stop flag to halt running browser agent gracefully |
@@ -211,6 +225,6 @@ Candidate qualifications are loaded from [`Mushfiq_Kabir_CV.json`](Mushfiq_Kabir
 
 ## 🛡 Security & Design Standards
 
-- **Zero Credentials in Code:** Reuses active authenticated sessions via Chrome DevTools Protocol (CDP).
-- **Human-Paced Navigation:** Uses random human jitter (2.0–3.5s) between clicks and scrolls to respect LinkedIn rate limits.
+- **Zero Credentials in Code:** Reuses active authenticated sessions via Chrome DevTools Protocol (CDP). Real API keys live only in ignored `.env` files (root + `backend/.env`), never in git.
+- **Human-Paced Navigation:** Uses random human jitter (2.0–4.5s) between clicks and scrolls to respect LinkedIn rate limits, with daily evaluation caps.
 - **Analogue Minimalist Aesthetic:** Monochromatic palette (`#000000`, `#ffffff`, `#666666`), negative letter tracking, 18px rounded cards, 9999px pills, zero artificial shadows.

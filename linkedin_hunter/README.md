@@ -14,9 +14,13 @@ Matching jobs and feed opportunities are saved to `output/jobs_report.md`, `outp
 - **Dynamic Multi-Target Scroller:**
   Specifically targets `<main id="workspace">` / `.scaffold-layout__main` with `PageDown` key integration to trigger LinkedIn's dynamic virtual loading on every scroll.
 - **Sub-300ms Logprob Scoring:**
-  Evaluates fit probabilities directly from native token logprobs in LM Studio. Zero prompt hallucinations, zero JSON parsing failures, and zero timeouts.
+  Evaluates fit probabilities directly from native token logprobs in LM Studio. Zero prompt hallucinations, zero JSON parsing failures, and zero timeouts. BM25 prescreen filters obvious non-fits first; scores are calibrated (cap 94) with `role/tools/level/domain` breakdowns, real JD keywords, gaps, and cover hooks.
 - **Persistent Anti-Duplicate Memory:**
-  Maintains signature hashing (`{title} @@ {company}`) in `seen_jobs.json` to skip previously evaluated cards in 0.001s.
+  Maintains ID + signature (`{title} @@ {company}`) + JD-body hashes in `seen_jobs.json` to skip previously evaluated cards in 0.001s — including identical JDs reposted under different posters (merged as aliases).
+- **Easy Apply + Extract-First Scraping:**
+  Optional Easy Apply filter with recent-first sorting; card metadata is snapshotted in one JS pass (no detached-element failures) with jittered human pacing (2.0–4.5s) and daily evaluation caps.
+- **One Hunting Core:**
+  `hunt_core.run_hunt()` is the single seam behind CLI (`hunter.py`) and dashboard (`web.py`); inject fakes to test without LM Studio or Playwright.
 - **Recruiter Profile Inspection:**
   Automatically identifies post authors and hiring leads (`/in/<username>`) and company pages (`/company/<name>`).
 
@@ -66,14 +70,19 @@ Open **`http://127.0.0.1:8085`** to launch the agent with one click, watch live 
 | `--limit` | `--max-eval` | `120` | Safety ceiling of total raw jobs to evaluate across all queries |
 | `--max-feed-scrolls`| | `80` | Safety ceiling of scrolls on the LinkedIn feed |
 | `--feed-only` | | `False` | Scan LinkedIn News Feed directly without searching job posts first |
+| `--easy-apply` | | `False` | Only Easy Apply jobs (`f_AL=true`, recent-first) |
+| `--criteria` | | `None` | Custom SemIf criteria lines (overrides defaults) |
+| `--daily-cap` | | `80` | Max LLM evaluations per run (safety cap) |
+| `--rotate-queries` | | `True` | Auto-rotate related queries if under target |
 | `--view-profiles` | | `True` | Visit recruiter and company profiles to gather details |
+| `--save-on-linkedin` | | `False` | Also click "Save" bookmark button on LinkedIn |
 | `--headless` | | `False` | Run browser invisibly in the background |
 
 ---
 
 ## 📄 Output Files
 
-- `output/jobs_report.md`: Markdown summary table with match percentages, AI fit analysis, and direct application / profile links.
-- `output/jobs.csv`: Spreadsheet export formatted for spreadsheet trackers.
-- `output/matched_jobs.json`: Full structured JSON data records.
-- `seen_jobs.json`: Deduplication cache containing evaluated IDs and signatures.
+- `output/jobs_report.md`: `Top 3 Apply Now` + summary table (priority/type/deadline) + detailed breakdowns (factors, JD keywords, gaps, cover openers) + separate Network Leads section.
+- `output/jobs.csv`: Spreadsheet export (scores, priorities, keywords, gaps, hooks, links).
+- `output/matched_jobs.json`: Full structured JSON records (includes `raw_score`, `fit_breakdown`, `jd_hash`, `aliases`).
+- `seen_jobs.json`: Deduplication cache (IDs, signatures, JD hashes, skip reasons, searched queries). Tracked intentionally for continuity; secrets never live here.

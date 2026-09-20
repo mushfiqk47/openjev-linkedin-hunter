@@ -129,16 +129,22 @@ def detect_employment_type(title: str, description: str) -> str:
 
 
 class JobEvaluator:
-    def __init__(self, base_url: str = LLM_BASE_URL, model: str = LLM_MODEL):
+    def __init__(self, base_url: str = LLM_BASE_URL, model: str = LLM_MODEL,
+                 client=None, meta: dict | None = None):
+        """Accept a prebuilt client (fake adapter in tests); create one only when absent."""
         self.model = model
         self.base_url = base_url
         self.candidate_profile = get_candidate_profile_prompt()
-        self.client, _, self.meta = load_model(
-            source=self.model,
-            revision="lm-studio-local",
-            base_url=self.base_url,
-            reasoning_effort="none",
-        )
+        if client is not None:
+            self.client = client
+            self.meta = meta or {"source": model, "backend": "injected"}
+        else:
+            self.client, _, self.meta = load_model(
+                source=self.model,
+                revision="lm-studio-local",
+                base_url=self.base_url,
+                reasoning_effort="none",
+            )
 
     def _score_row(self, row: dict):
         res = score(self.client, None, row, self.meta)
