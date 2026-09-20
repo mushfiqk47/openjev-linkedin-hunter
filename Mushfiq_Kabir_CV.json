@@ -1,0 +1,150 @@
+{
+  "basics": {
+    "name": "Mushfiq Kabir",
+    "label": "Graphic & UI/UX Designer",
+    "email": "mushfiqk47@gmail.com",
+    "phone": "+8801635309469",
+    "location": {
+      "address": "Uttara, Dhaka, Bangladesh",
+      "city": "Dhaka",
+      "area": "Uttara",
+      "country": "Bangladesh"
+    },
+    "profiles": [
+      {
+        "network": "Behance",
+        "username": "mushfiqkabir1",
+        "url": "https://www.behance.net/mushfiqkabir1"
+      },
+      {
+        "network": "LinkedIn",
+        "username": "mushfiq-kabir-uiux",
+        "url": "https://www.linkedin.com/in/mushfiq-kabir-uiux/"
+      },
+      {
+        "network": "GitHub",
+        "username": "mushfiqk47",
+        "url": "https://github.com/mushfiqk47"
+      },
+      {
+        "network": "Portfolio",
+        "username": "mushfiqkabiruix",
+        "url": "https://mushfiqkabiruix.vercel.app/"
+      }
+    ]
+  },
+  "summary": "UI/UX and Graphic Designer with hands-on experience across SaaS platforms, mobile apps, and brand identity projects. Focused on delivering clean, purposeful design that balances aesthetics with usability. Skilled in Figma-led design workflows, design systems, and producing polished, client-ready work. Passionate about detail, clarity, and creating visual experiences that connect with users.",
+  "work": [
+    {
+      "position": "Freelance UI/UX Designer",
+      "company": "Freelance",
+      "startDate": "2024",
+      "endDate": "Present",
+      "highlights": [
+        "Delivered design projects for clients across SaaS, e-commerce, and mobile app verticals",
+        "Designed PocketPharma, an OTC pharmacy marketplace UI focused on Vitamins & Supplements"
+      ]
+    },
+    {
+      "position": "UI/UX Industrial Attachment",
+      "company": "Creative IT Institute",
+      "startDate": "2024",
+      "endDate": "2024",
+      "highlights": [
+        "Completed intensive UI/UX training covering user research, wireframing, and prototyping",
+        "Produced end-to-end design deliverables for real client briefs under professional mentorship"
+      ]
+    },
+    {
+      "position": "Computer Club Mentor",
+      "company": "Satkhira Polytechnic",
+      "startDate": "2023",
+      "endDate": "2023",
+      "highlights": [
+        "Mentoring students in UI/UX principles, Figma, and design fundamentals",
+        "Organised workshops on design thinking and portfolio building"
+      ]
+    }
+  ],
+  "skills": [
+    {
+      "category": "Design Tools",
+      "keywords": ["Figma", "Adobe XD", "Illustrator", "Photoshop"]
+    },
+    {
+      "category": "Design Systems",
+      "keywords": ["Component Libraries", "Design Tokens", "Design Systems", "Prototyping"]
+    },
+    {
+      "category": "Soft Skills",
+      "keywords": ["Client Communication", "Design Thinking", "Mentoring", "Attention to Detail"]
+    }
+  ],
+  "projects": [
+    {
+      "name": "PocketPharma",
+      "description": "OTC pharmacy marketplace UI: high-precision interface for vitamins & supplements.",
+      "type": "Mobile App / SaaS UI"
+    },
+    {
+      "name": "WebtoFig",
+      "description": "Live website to editable Figma converter — deployed on Vercel.",
+      "url": "https://webtofig.vercel.app/",
+      "type": "Web App / Developer Tool"
+    },
+    {
+      "name": "Mes Avantages",
+      "description": "A loyalty and health tracking platform for the French pharmaceutical sector, patient CRM, real-time sales data, and therapeutic compliance dashboards.",
+      "type": "SaaS Platform"
+    },
+    {
+      "name": "Guehi & Co",
+      "description": "Premium audio service website with an interactive event configurator, booking system, and dual dashboards for admin CRM and client management.",
+      "type": "Website + Dashboard"
+    },
+    {
+      "name": "Cabinet Maître Assi",
+      "description": "Professional website for a corporate and sports law firm with clear user journeys, legal expertise showcasing, and accessible consultation booking.",
+      "type": "Corporate Website"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Northern University Bangladesh",
+      "degree": "BSc in Computer Science and Engineering",
+      "startDate": "2025",
+      "endDate": "Present"
+    },
+    {
+      "institution": "Satkhira Govt. Polytechnic Institute",
+      "degree": "Diploma in Computer Science",
+      "gpa": "3.37",
+      "startDate": "2021",
+      "endDate": "2024"
+    },
+    {
+      "institution": "Satkhira Govt. Technical School and College",
+      "degree": "SSC, Vocational",
+      "gpa": "4.64",
+      "startDate": "2018",
+      "endDate": "2020"
+    }
+  ],
+  "certificates": [
+    {
+      "issuer": "Creative IT Institute",
+      "name": "UI & UX Designer",
+      "date": "2024"
+    },
+    {
+      "issuer": "GP Academy",
+      "name": "CV Writing",
+      "date": "2023"
+    },
+    {
+      "issuer": "Graphics School",
+      "name": "Graphics Design",
+      "date": "2023"
+    }
+  ]
+}
