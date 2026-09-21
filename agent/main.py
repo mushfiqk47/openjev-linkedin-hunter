@@ -17,6 +17,7 @@ def show_banner():
   4. 🔑 Login to LinkedIn (Save Browser Session)
   5. 🧠 Triage Matched Jobs (next actions + recruiter openers)
   6. 💬 Run LinkedIn Network Outreach (Autonomous SemIf DM Agent)
+  7. 🤝 Run Targeted Connection Agent (AI Scored Blank Connect Requests)
   0. 🚪 Exit
 ===============================================================
 """)
@@ -81,11 +82,29 @@ def handle_outreach():
 
     subprocess.run(cmd, cwd=str(sms_dir))
 
+def handle_connect():
+    base_dir = Path(__file__).resolve().parent.parent
+    connect_dir = base_dir / "linkedin_connect"
+    agent_py = connect_dir / "agent.py"
+
+    print("\n--- 🤝 LinkedIn Targeted Connection Agent ---")
+    mode = input("Run mode: [1] Live Connect  [2] Dry-Run Simulation (safe preview) [default: 2]: ").strip() or "2"
+    dry_run = mode != "1"
+    limit = input("Daily connect limit override (Press Enter for default): ").strip()
+
+    cmd = [sys.executable, str(agent_py)]
+    if dry_run:
+        cmd.append("--dry-run")
+    if limit:
+        cmd.extend(["--limit", limit])
+
+    subprocess.run(cmd, cwd=str(connect_dir))
+
 def main():
     while True:
         try:
             show_banner()
-            choice = input("Select an option (0-6): ").strip()
+            choice = input("Select an option (0-7): ").strip()
 
             if choice == "1":
                 q = input("Job Title [default: 'UI/UX Designer']: ").strip() or "UI/UX Designer"
@@ -104,11 +123,13 @@ def main():
                 handle_triage()
             elif choice == "6":
                 handle_outreach()
+            elif choice == "7":
+                handle_connect()
             elif choice == "0":
                 print("\nGoodbye! 👋\n")
                 break
             else:
-                print("[!] Invalid option. Please choose 0 to 6.")
+                print("[!] Invalid option. Please choose 0 to 7.")
         except (KeyboardInterrupt, EOFError):
             print("\nGoodbye! 👋\n")
             break

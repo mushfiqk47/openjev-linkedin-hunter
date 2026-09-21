@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, Protocol
 
-from .config import DEFAULT_QUERIES, DEFAULT_MIN_SCORE, DEFAULT_MIN_MATCHES
+from .config import DEFAULT_QUERIES, DEFAULT_MIN_SCORE, DEFAULT_MIN_MATCHES, MAX_FEED_SCROLLS
 from .storage import record_skip_reason, save_searched_query
 
 @dataclass
@@ -24,7 +24,7 @@ class HuntParams:
     easy_apply: bool = False
     explore_feed: bool = True
     feed_only: bool = False
-    max_feed_scrolls: int = 8
+    max_feed_scrolls: int = MAX_FEED_SCROLLS
     criteria: list[str] | None = None
 
     enforce_caps: bool = False

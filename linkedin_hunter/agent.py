@@ -18,7 +18,7 @@ try:
     import playwright
 except ImportError:
     venv_py = CURRENT_DIR / ".venv" / "bin" / "python"
-    if venv_py.is_file() and Path(sys.executable).resolve() != venv_py.resolve():
+    if __name__ == "__main__" and venv_py.is_file() and Path(sys.executable).resolve() != venv_py.resolve():
         os.execv(str(venv_py), [str(venv_py)] + sys.argv)
 
 from linkedin_hunter.browser import LinkedInBrowser
@@ -31,6 +31,7 @@ from linkedin_hunter.config import (
     ENABLE_HUMAN_DELAYS,
     LLM_BASE_URL,
     LLM_MODEL,
+    MAX_FEED_SCROLLS,
     get_int,
     load_env,
 )
@@ -100,6 +101,12 @@ def build_parser():
         help=f"Safety limit of jobs to inspect per query (default: from .env or {DEFAULT_JOB_LIMIT})",
     )
     parser.add_argument(
+        "--max-feed-scrolls",
+        type=int,
+        default=None,
+        help=f"Safety ceiling of scrolls on the LinkedIn feed (default: from .env or {MAX_FEED_SCROLLS})",
+    )
+    parser.add_argument(
         "--feed-only",
         action="store_true",
         help="Scan LinkedIn News Feed directly for hiring leads without searching job posts first",
@@ -135,15 +142,18 @@ def main(argv=None):
     query = args.query if args.query is not None else (DEFAULT_QUERIES[0] if DEFAULT_QUERIES else "UI/UX Designer")
     max_pages = args.max_pages if args.max_pages is not None else get_int("DEFAULT_MAX_PAGES_PER_QUERY", 2)
     job_limit = args.limit if args.limit is not None else get_int("DEFAULT_JOB_LIMIT", 50)
+    max_feed_scrolls = args.max_feed_scrolls if args.max_feed_scrolls is not None else get_int("MAX_FEED_SCROLLS", MAX_FEED_SCROLLS)
     daily_cap = get_int("DAILY_EVALUATE_CAP", 120)
 
     target_src = "CLI override" if args.min_matches is not None else ("from .env" if "DAILY_TARGET_MATCHES" in os.environ or "DEFAULT_MIN_MATCHES" in os.environ else "default")
     score_src = "CLI override" if args.min_score is not None else ("from .env" if "DEFAULT_MIN_SCORE" in os.environ else "default")
+    feed_scrolls_src = "CLI override" if args.max_feed_scrolls is not None else ("from .env" if "MAX_FEED_SCROLLS" in os.environ else "default")
 
     print("=" * 68)
     print("🚀 Starting Autonomous LinkedIn Job Hunter Agent (Jev System)")
     print(f"   Target Matches:     {target_matches} opportunities ({target_src})")
     print(f"   Min Match Score:    {min_score}% ({score_src})")
+    print(f"   Max Feed Scrolls:   {max_feed_scrolls} scrolls ({feed_scrolls_src})")
     if args.feed_only:
         print("   Mode:               DIRECT FEED SCAN (Hiring posts)")
     else:
@@ -183,7 +193,7 @@ def main(argv=None):
         easy_apply=args.easy_apply,
         explore_feed=True,
         feed_only=args.feed_only,
-        max_feed_scrolls=80,
+        max_feed_scrolls=max_feed_scrolls,
         enforce_caps=args.enforce_caps,
     )
 

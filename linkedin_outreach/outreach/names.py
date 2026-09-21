@@ -1,5 +1,6 @@
 import re
 import unicodedata
+import urllib.parse
 
 def clean_display_name(n):
     n = unicodedata.normalize("NFKC", n or "").replace("\u200e", "").replace("\u200f", "").strip()

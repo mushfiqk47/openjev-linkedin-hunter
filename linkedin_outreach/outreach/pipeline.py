@@ -13,6 +13,7 @@ from outreach.evaluator import evaluate_contact
 from outreach.messaging import build_message
 from outreach.progress import refresh_progress
 from outreach.registry import ConnectionsRegistry, get_registry
+from outreach.restricted import apply_restricted_scan, is_restricted
 from outreach.sync import sync_network
 
 @dataclass
@@ -33,6 +34,7 @@ class PipelineResult:
     unsent_found: int = 0
     sent: int = 0
     skipped: int = 0
+    restricted: int = 0
     failed: int = 0
     remaining_budget: int = 0
     items: list[dict] = field(default_factory=list)
@@ -49,6 +51,10 @@ def run_pipeline(
     stop = should_stop or (lambda: False)
 
     result = PipelineResult()
+    initial_restricted = apply_restricted_scan(reg, on_event=log)
+    if initial_restricted > 0:
+        result.restricted += initial_restricted
+        log(f"Pre-flight restricted scan: {initial_restricted} connection(s) marked RESTRICTED.", "info")
     today = date.today().strftime("%Y-%m-%d")
     daily_limit = params.limit if params.limit is not None else get_int("DAILY_LIMIT", 15)
     sent_today = reg.count_sent_today(today)
@@ -113,6 +119,15 @@ def run_pipeline(
         name = contact.get("name", "Connection")
         log(f"Evaluating candidate [{i + 1}/{len(to_process)}]: {name}", "info")
 
+        restricted, rest_reason = is_restricted(contact)
+        if restricted:
+            log(f"  [⛔ RESTRICTED] {name}: {rest_reason}. Will not send messages.", "warning")
+            if not params.dry_run:
+                reg.record_restricted(contact, reason=rest_reason)
+            result.restricted += 1
+            result.items.append({"name": name, "status": "RESTRICTED", "detail": rest_reason})
+            continue
+
         eval_res = evaluate_contact(contact)
         archetype = eval_res.get("archetype", "general")
         relevance = int(eval_res.get("relevance", 60))
@@ -175,5 +190,5 @@ def run_pipeline(
                 time.sleep(delay)
 
     refresh_progress()
-    log(f"Pipeline execution finished. Sent: {result.sent} | Skipped: {result.skipped} | Failed: {result.failed}", "success")
+    log(f"Pipeline execution finished. Sent: {result.sent} | Skipped: {result.skipped} | Restricted: {result.restricted} | Failed: {result.failed}", "success")
     return result

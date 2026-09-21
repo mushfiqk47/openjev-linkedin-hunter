@@ -17,6 +17,7 @@ REGISTRY_FILE = data_file("connections_registry.json")
 PROGRESS_FILE = data_file("progress.txt")
 TOTAL_FILE = data_file("total_connections.txt")
 MESSAGE_FILE = data_file("message.py")
+RESTRICTED_FILE = data_file("restricted.txt")
 
 DEFAULT_PORTFOLIO_URL = "https://mushfiqkabiruix.vercel.app/"
 DEFAULT_CONNECTIONS_URL = "https://www.linkedin.com/mynetwork/invite-connect/connections/"

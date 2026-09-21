@@ -4,6 +4,7 @@ from .config import (
     DEFAULT_MIN_SCORE,
     DEFAULT_MIN_MATCHES,
     DEFAULT_MAX_PAGES_PER_QUERY,
+    MAX_FEED_SCROLLS,
 )
 from .cv_loader import load_cv_data
 from .evaluator import JobEvaluator
@@ -74,8 +75,8 @@ def main():
     parser.add_argument(
         "--max-feed-scrolls",
         type=int,
-        default=80,
-        help="Safety ceiling of scrolls on the LinkedIn feed (default: 80)",
+        default=MAX_FEED_SCROLLS,
+        help=f"Safety ceiling of scrolls on the LinkedIn feed (default: {MAX_FEED_SCROLLS})",
     )
     parser.add_argument(
         "--rotate-queries",

@@ -2,11 +2,15 @@ import random
 import re
 import time
 import urllib.parse
-from playwright.sync_api import Playwright, BrowserContext, Page, sync_playwright
+try:
+    from playwright.sync_api import Playwright, BrowserContext, Page, sync_playwright
+except ImportError:
+    Playwright = BrowserContext = Page = sync_playwright = None  # type: ignore
 from .config import (
     CHROME_CDP_URL, BASE_DIR, RECENCY_FILTERS, WORK_TYPES,
     ENABLE_HUMAN_DELAYS, HUMAN_DELAY_MIN, HUMAN_DELAY_MAX,
-    CARD_CLICK_DELAY_MIN, CARD_CLICK_DELAY_MAX,
+    CARD_CLICK_DELAY_MIN, CARD_CLICK_DELAY_MAX, MAX_FEED_SCROLLS,
+    SCROLL_DELAY,
 )
 from .storage import is_job_seen, record_skip_reason, save_seen_job, jd_hash
 
@@ -80,6 +84,8 @@ class LinkedInBrowser:
         self.is_cdp = False
 
     def start(self):
+        if sync_playwright is None:
+            raise RuntimeError("Playwright is not installed in the active environment. Please activate the virtualenv.")
         self.playwright = sync_playwright().start()
 
         for ws_url in find_active_devtools_ws_candidates():
@@ -191,8 +197,21 @@ class LinkedInBrowser:
 
         leads = []
         print("\n[*] Navigating to LinkedIn Feed to scan for hiring opportunities...")
-        self.page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=30000)
-        human_pause(0.5, 3.0)
+        feed_loaded = False
+        for url in ("https://www.linkedin.com/feed/", "https://www.linkedin.com/"):
+            try:
+                self.page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                if "chrome-error://" not in self.page.url:
+                    human_pause(0.5, 3.0)
+                    feed_loaded = True
+                    break
+            except Exception:
+                pass
+
+        if not feed_loaded:
+            print("  [!] LinkedIn feed rate-limited or unavailable.")
+            return leads
+
         if "login" in self.page.url or "authwall" in self.page.url:
             self.check_login()
 
@@ -200,6 +219,8 @@ class LinkedInBrowser:
         for s in range(max_scrolls):
             print(f"  [Feed] Scrolling feed (step {s + 1}/{max_scrolls})...")
             self.page.evaluate("window.scrollBy(0, 900)")
+            if SCROLL_DELAY > 0:
+                time.sleep(SCROLL_DELAY)
             if ENABLE_HUMAN_DELAYS:
                 time.sleep(random.uniform(1.8, 2.5))
 
@@ -275,6 +296,8 @@ class LinkedInBrowser:
                         else window.scrollBy(0, 800 + Math.floor(Math.random()*400));
                     }"""
                 )
+                if SCROLL_DELAY > 0:
+                    time.sleep(SCROLL_DELAY)
                 human_pause(1.2, 2.0)
 
             snapshots = self.page.evaluate("""() => {
@@ -476,7 +499,7 @@ class LinkedInBrowser:
         seen_state: dict,
         target_matches: int = 10,
         current_matched: int = 0,
-        max_scrolls: int = 80,
+        max_scrolls: int = MAX_FEED_SCROLLS,
         view_profiles: bool = True,
         criteria: list[str] | None = None,
         on_status_update=None,
@@ -491,8 +514,23 @@ class LinkedInBrowser:
         if on_status_update:
             on_status_update(f"Navigating to LinkedIn News Feed (Need {target_matches - current_matched} more matches)...")
 
-        self.page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded", timeout=35000)
-        human_pause(2.5, 3.5)
+        feed_loaded = False
+        for url in ("https://www.linkedin.com/feed/", "https://www.linkedin.com/"):
+            try:
+                self.page.goto(url, wait_until="domcontentloaded", timeout=35000)
+                if "chrome-error://" not in self.page.url:
+                    human_pause(2.5, 3.5)
+                    feed_loaded = True
+                    break
+            except Exception as e:
+                print(f"  [!] Feed navigation to {url} failed: {e}")
+
+        if not feed_loaded:
+            print("  [!] LinkedIn feed returned rate limit or error (HTTP 429). Skipping feed scan.")
+            if on_status_update:
+                on_status_update("LinkedIn feed rate-limited. Skipping feed scan.")
+            return current_matched
+
         if "login" in self.page.url or "authwall" in self.page.url:
             self.check_login()
 
@@ -680,6 +718,8 @@ class LinkedInBrowser:
                 self.page.keyboard.press("PageDown")
             except Exception:
                 pass
+            if SCROLL_DELAY > 0:
+                time.sleep(SCROLL_DELAY)
             human_pause(2.4, 3.8)
 
         return matched_count

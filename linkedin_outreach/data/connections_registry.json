@@ -2,7 +2,7 @@
   "version": 2,
   "last_sync": "2026-09-21T13:46:46.886648",
   "total_tracked": 370,
-  "messaged_count": 310,
+  "messaged_count": 319,
   "connections": {
     "md hanjala": {
       "name": "Md Hanjala",
@@ -2561,10 +2561,13 @@
       "slug": "faysal-al-nur-a7952428a",
       "profile_url": "https://www.linkedin.com/in/faysal-al-nur-a7952428a/",
       "headline": "UX Designer at Design Schilars",
-      "status": "FAILED",
-      "sent_at": "2026-08-16 12:00:00",
+      "status": "SENT",
+      "sent_at": "2026-09-21 14:12:54",
       "in_network": true,
-      "migrated_from_ledger": true
+      "migrated_from_ledger": true,
+      "archetype": "peer",
+      "relevance": 98,
+      "detail": "verified"
     },
     "samihashama": {
       "name": "Mst. Samiha Shama",
@@ -3187,10 +3190,13 @@
       "slug": "sabrina-sultana-2759b923b",
       "profile_url": "https://www.linkedin.com/in/sabrina-sultana-2759b923b/",
       "headline": "",
-      "status": "FAILED",
-      "sent_at": "2026-08-16 12:00:00",
+      "status": "SENT",
+      "sent_at": "2026-09-21 14:13:22",
       "in_network": true,
-      "migrated_from_ledger": true
+      "migrated_from_ledger": true,
+      "archetype": "peer",
+      "relevance": 88,
+      "detail": "verified"
     },
     "sanjida-munira-348431343": {
       "name": "Sanjida Munira",
@@ -3702,12 +3708,14 @@
       "profile_url": "https://www.linkedin.com/messaging/compose/?profileUrn=urn%3Ali%3Afsd_profile%3AACoAAGO2Lf4BW_kjdwKnzKTY9Z4mqcEsPosoG6M&recipient=ACoAAGO2Lf4BW_kjdwKnzKTY9Z4mqcEsPosoG6M&interop=msgOverlay",
       "compose_url": "https://www.linkedin.com/messaging/compose/?profileUrn=urn%3Ali%3Afsd_profile%3AACoAAGO2Lf4BW_kjdwKnzKTY9Z4mqcEsPosoG6M&recipient=ACoAAGO2Lf4BW_kjdwKnzKTY9Z4mqcEsPosoG6M&interop=msgOverlay",
       "headline": "",
-      "status": "FAILED",
+      "status": "SENT",
       "in_network": true,
       "discovered_at": "2026-09-21 13:45:26",
       "archetype": "peer",
       "relevance": 87,
-      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)"
+      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)",
+      "sent_at": "2026-09-21 14:13:40",
+      "detail": "verified"
     },
     "uxwithnasimul": {
       "name": "Md Nasi",
@@ -3715,12 +3723,14 @@
       "profile_url": "https://www.linkedin.com/in/uxwithnasimul/",
       "compose_url": "https://www.linkedin.com/in/uxwithnasimul/",
       "headline": "",
-      "status": "FAILED",
+      "status": "SKIPPED",
       "in_network": true,
       "discovered_at": "2026-09-21 13:45:56",
       "archetype": "peer",
       "relevance": 87,
-      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)"
+      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)",
+      "skip_reason": "live thread already had messages",
+      "skipped_at": "2026-09-21 14:13:55"
     },
     "abujaforhadi": {
       "name": "Md. Abu Jafor",
@@ -3728,12 +3738,14 @@
       "profile_url": "https://www.linkedin.com/in/abujaforhadi/",
       "compose_url": "https://www.linkedin.com/in/abujaforhadi/",
       "headline": "",
-      "status": "FAILED",
+      "status": "SENT",
       "in_network": true,
       "discovered_at": "2026-09-21 13:45:59",
       "archetype": "peer",
       "relevance": 82,
-      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)"
+      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)",
+      "sent_at": "2026-09-21 14:14:20",
+      "detail": "verified"
     },
     "maliha-hossain-790255187": {
       "name": "Maliha Hossain",
@@ -3741,12 +3753,14 @@
       "profile_url": "https://www.linkedin.com/in/maliha-hossain-790255187/",
       "compose_url": "https://www.linkedin.com/in/maliha-hossain-790255187/",
       "headline": "",
-      "status": "FAILED",
+      "status": "RESTRICTED",
       "in_network": true,
       "discovered_at": "2026-09-21 13:46:00",
-      "archetype": "peer",
+      "archetype": "restricted_account",
       "relevance": 86,
-      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)"
+      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)",
+      "restricted_at": "2026-09-21 14:12:33",
+      "restricted_reason": "matched restricted name 'Maliha Hossain'"
     },
     "pollob-sarkar-a91a32211": {
       "name": "Pollob Sarkar",
@@ -3754,12 +3768,14 @@
       "profile_url": "https://www.linkedin.com/in/pollob-sarkar-a91a32211/",
       "compose_url": "https://www.linkedin.com/in/pollob-sarkar-a91a32211/",
       "headline": "",
-      "status": "FAILED",
+      "status": "SKIPPED",
       "in_network": true,
       "discovered_at": "2026-09-21 13:46:04",
       "archetype": "peer",
       "relevance": 71,
-      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)"
+      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)",
+      "skip_reason": "live thread already had messages",
+      "skipped_at": "2026-09-21 14:14:35"
     },
     "marjana-rohoman-a116b135a": {
       "name": "Marjana Rohoman",
@@ -3767,12 +3783,14 @@
       "profile_url": "https://www.linkedin.com/in/marjana-rohoman-a116b135a/",
       "compose_url": "https://www.linkedin.com/in/marjana-rohoman-a116b135a/",
       "headline": "",
-      "status": "FAILED",
+      "status": "SKIPPED",
       "in_network": true,
       "discovered_at": "2026-09-21 13:46:04",
       "archetype": "peer",
       "relevance": 84,
-      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)"
+      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)",
+      "skip_reason": "live thread already had messages",
+      "skipped_at": "2026-09-21 14:14:46"
     },
     "sakafim": {
       "name": "S. M. Abdulla Hil Kafi",
@@ -3780,12 +3798,14 @@
       "profile_url": "https://www.linkedin.com/in/sakafim/",
       "compose_url": "https://www.linkedin.com/in/sakafim/",
       "headline": "",
-      "status": "FAILED",
+      "status": "SENT",
       "in_network": true,
       "discovered_at": "2026-09-21 13:46:07",
       "archetype": "peer",
       "relevance": 71,
-      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)"
+      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)",
+      "sent_at": "2026-09-21 14:15:07",
+      "detail": "verified"
     },
     "awlad21": {
       "name": "Awlad Hossain",
@@ -3793,12 +3813,14 @@
       "profile_url": "https://www.linkedin.com/in/awlad21/",
       "compose_url": "https://www.linkedin.com/in/awlad21/",
       "headline": "",
-      "status": "FAILED",
+      "status": "SENT",
       "in_network": true,
       "discovered_at": "2026-09-21 13:46:07",
       "archetype": "peer",
       "relevance": 77,
-      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)"
+      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)",
+      "sent_at": "2026-09-21 14:15:34",
+      "detail": "verified"
     },
     "mmrahman007": {
       "name": "Md Mostafijur Rahman",
@@ -3806,12 +3828,14 @@
       "profile_url": "https://www.linkedin.com/in/mmrahman007/",
       "compose_url": "https://www.linkedin.com/in/mmrahman007/",
       "headline": "",
-      "status": "FAILED",
+      "status": "SENT",
       "in_network": true,
       "discovered_at": "2026-09-21 13:46:11",
       "archetype": "peer",
       "relevance": 83,
-      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)"
+      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)",
+      "sent_at": "2026-09-21 14:16:06",
+      "detail": "verified"
     },
     "rafez-hossain-digital-product-designer": {
       "name": "Md Rafez Hossain",
@@ -3819,12 +3843,14 @@
       "profile_url": "https://www.linkedin.com/in/rafez-hossain-digital-product-designer/",
       "compose_url": "https://www.linkedin.com/in/rafez-hossain-digital-product-designer/",
       "headline": "",
-      "status": "FAILED",
+      "status": "SENT",
       "in_network": true,
       "discovered_at": "2026-09-21 13:46:14",
       "archetype": "peer",
       "relevance": 84,
-      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)"
+      "last_error": "stopped before sending (stage: editor, found: None, disabled: None)",
+      "sent_at": "2026-09-21 14:16:34",
+      "detail": "verified"
     },
     "shanzidasayma": {
       "name": "Sayma Sharmin Shanzida",
@@ -3832,11 +3858,13 @@
       "profile_url": "https://www.linkedin.com/messaging/compose/?profileUrn=urn%3Ali%3Afsd_profile%3AACoAADXPozYBddvAerQmNVauIdESrzcYxSTxCKI&recipient=ACoAADXPozYBddvAerQmNVauIdESrzcYxSTxCKI&interop=msgOverlay",
       "compose_url": "https://www.linkedin.com/messaging/compose/?profileUrn=urn%3Ali%3Afsd_profile%3AACoAADXPozYBddvAerQmNVauIdESrzcYxSTxCKI&recipient=ACoAADXPozYBddvAerQmNVauIdESrzcYxSTxCKI&interop=msgOverlay",
       "headline": "",
-      "status": "UNSENT",
+      "status": "SENT",
       "in_network": true,
       "discovered_at": "2026-09-21 13:45:26",
       "archetype": "peer",
-      "relevance": 88
+      "relevance": 88,
+      "sent_at": "2026-09-21 14:16:57",
+      "detail": "verified"
     },
     "shobrata-das-722360148": {
       "name": "Shobrata Das",

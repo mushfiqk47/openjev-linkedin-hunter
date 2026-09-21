@@ -48,3 +48,25 @@ def test_enforce_caps_restores_early_stop():
 
     assert result.evaluated == 2
     assert result.matched == 0
+
+def test_feed_phase_passes_configured_max_scrolls():
+    captured_max_scrolls = []
+    def fake_browse_feed(**kwargs):
+        captured_max_scrolls.append(kwargs.get("max_scrolls"))
+        return 0
+
+    evaluator = FakeEvaluator(scores={})
+    deps = make_deps(evaluator, [])
+    deps.browse_feed = fake_browse_feed
+
+    params = HuntParams(query="UI/UX Designer", auto_rotate=False, explore_feed=True,
+                        feed_only=True, max_feed_scrolls=42)
+    run_hunt(params, deps, HuntHooks())
+
+    assert captured_max_scrolls == [42]
+
+def test_agent_parser_supports_max_feed_scrolls():
+    from linkedin_hunter.agent import build_parser
+    parser = build_parser()
+    args = parser.parse_args(["--max-feed-scrolls", "55"])
+    assert args.max_feed_scrolls == 55

@@ -353,7 +353,7 @@ class TestRealLedger(unittest.TestCase):
             self.skipTest("no ledger file")
         entries = parse_ledger()
         self.assertGreater(len(entries), 100)
-        self.assertTrue(all(e["status"] in ("SENT", "FAILED", "UNKNOWN", "SKIPPED") for e in entries))
+        self.assertTrue(all(e["status"] in ("SENT", "FAILED", "UNKNOWN", "SKIPPED", "RESTRICTED") for e in entries))
 
 class TestEvaluator(unittest.TestCase):
     def test_bm25_prescreen_disqualifies(self):

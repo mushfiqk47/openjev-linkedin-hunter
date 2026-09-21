@@ -337,7 +337,7 @@
 - Shuvo Kumar Paul (2026-09-21 13:46:56) - FAILED - https://www.linkedin.com/messaging/compose/?profileUrn=urn%3Ali%3Afsd_profile%3AACoAAGO2Lf4BW_kjdwKnzKTY9Z4mqcEsPosoG6M&recipient=ACoAAGO2Lf4BW_kjdwKnzKTY9Z4mqcEsPosoG6M&interop=msgOverlay
 - Md Nasi (2026-09-21 13:47:09) - FAILED - https://www.linkedin.com/in/uxwithnasimul/
 - Md. Abu Jafor (2026-09-21 13:47:23) - FAILED - https://www.linkedin.com/in/abujaforhadi/
-- Maliha Hossain (2026-09-21 13:47:35) - FAILED - https://www.linkedin.com/in/maliha-hossain-790255187/
+- Maliha Hossain (2026-09-21 13:47:35) - SENT - https://www.linkedin.com/in/maliha-hossain-790255187/
 - Pollob Sarkar (2026-09-21 13:47:49) - FAILED - https://www.linkedin.com/in/pollob-sarkar-a91a32211/
 - Marjana Rohoman (2026-09-21 13:48:02) - FAILED - https://www.linkedin.com/in/marjana-rohoman-a116b135a/
 - S. M. Abdulla Hil Kafi (2026-09-21 13:48:16) - FAILED - https://www.linkedin.com/in/sakafim/
@@ -346,3 +346,16 @@
 - Md Rafez Hossain (2026-09-21 13:48:56) - FAILED - https://www.linkedin.com/in/rafez-hossain-digital-product-designer/
 - Sayma Sharmin Shanzida (2026-09-21 13:49:05) - FAILED - https://www.linkedin.com/messaging/compose/?profileUrn=urn%3Ali%3Afsd_profile%3AACoAADXPozYBddvAerQmNVauIdESrzcYxSTxCKI&recipient=ACoAADXPozYBddvAerQmNVauIdESrzcYxSTxCKI&interop=msgOverlay
 - Shobrata Das (2026-09-21 13:49:19) - FAILED - https://www.linkedin.com/in/shobrata-das-722360148/
+- Maliha Hossain (2026-09-21 14:12:33) - RESTRICTED - https://www.linkedin.com/in/maliha-hossain-790255187/
+- Faysal Al Nur (2026-09-21 14:12:54) - SENT - https://www.linkedin.com/in/faysal-al-nur-a7952428a/
+- Sabrina Sultana (2026-09-21 14:13:22) - SENT - https://www.linkedin.com/in/sabrina-sultana-2759b923b/
+- Shuvo Kumar Paul (2026-09-21 14:13:40) - SENT - https://www.linkedin.com/messaging/compose/?profileUrn=urn%3Ali%3Afsd_profile%3AACoAAGO2Lf4BW_kjdwKnzKTY9Z4mqcEsPosoG6M&recipient=ACoAAGO2Lf4BW_kjdwKnzKTY9Z4mqcEsPosoG6M&interop=msgOverlay
+- Md Nasi (2026-09-21 14:13:55) - SKIPPED - https://www.linkedin.com/in/uxwithnasimul/
+- Md. Abu Jafor (2026-09-21 14:14:20) - SENT - https://www.linkedin.com/in/abujaforhadi/
+- Pollob Sarkar (2026-09-21 14:14:35) - SKIPPED - https://www.linkedin.com/in/pollob-sarkar-a91a32211/
+- Marjana Rohoman (2026-09-21 14:14:46) - SKIPPED - https://www.linkedin.com/in/marjana-rohoman-a116b135a/
+- S. M. Abdulla Hil Kafi (2026-09-21 14:15:07) - SENT - https://www.linkedin.com/in/sakafim/
+- Awlad Hossain (2026-09-21 14:15:34) - SENT - https://www.linkedin.com/in/awlad21/
+- Md Mostafijur Rahman (2026-09-21 14:16:06) - SENT - https://www.linkedin.com/in/mmrahman007/
+- Md Rafez Hossain (2026-09-21 14:16:34) - SENT - https://www.linkedin.com/in/rafez-hossain-digital-product-designer/
+- Sayma Sharmin Shanzida (2026-09-21 14:16:57) - SENT - https://www.linkedin.com/messaging/compose/?profileUrn=urn%3Ali%3Afsd_profile%3AACoAADXPozYBddvAerQmNVauIdESrzcYxSTxCKI&recipient=ACoAADXPozYBddvAerQmNVauIdESrzcYxSTxCKI&interop=msgOverlay

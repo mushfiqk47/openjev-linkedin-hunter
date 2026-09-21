@@ -5,7 +5,7 @@ import re
 from outreach.config import LEDGER_FILE
 from outreach.names import norm_name, profile_slug
 
-DONE_STATUSES = ("SENT", "UNKNOWN", "SKIPPED")
+DONE_STATUSES = ("SENT", "UNKNOWN", "SKIPPED", "RESTRICTED")
 
 LEDGER_RE = re.compile(
     r"^-\s+(.+?)\s+\((\d{4}-\d{2}-\d{2})[^)]*\)\s*(?:-\s*([A-Z]+)\b)?\s*(?:-\s*(https?://\S+))?\s*$"

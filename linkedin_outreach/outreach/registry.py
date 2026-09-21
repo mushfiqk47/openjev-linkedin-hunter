@@ -8,7 +8,7 @@ from outreach.config import LEDGER_FILE, REGISTRY_FILE
 from outreach.ledger import append_ledger, parse_ledger
 from outreach.names import clean_display_name, norm_name, profile_slug
 
-DONE_STATUSES = frozenset({"SENT", "UNKNOWN", "SKIPPED"})
+DONE_STATUSES = frozenset({"SENT", "UNKNOWN", "SKIPPED", "RESTRICTED"})
 
 class ConnectionsRegistry:
 
@@ -24,12 +24,15 @@ class ConnectionsRegistry:
 
         if isinstance(contact, str):
             slug = profile_slug(contact)
-            return slug if slug else norm_name(contact)
-        url = contact.get("profile_url") or contact.get("compose_url") or contact.get("url") or ""
-        slug = profile_slug(url)
+            if slug:
+                return slug
+            n = norm_name(contact)
+            return self.name_to_slug.get(n, n)
+        slug = contact.get("slug") or profile_slug(contact.get("profile_url") or contact.get("compose_url") or contact.get("url") or "")
         if slug:
             return slug
-        return norm_name(contact.get("name", ""))
+        n_name = norm_name(contact.get("name", ""))
+        return self.name_to_slug.get(n_name, n_name)
 
     def load(self) -> None:
 
@@ -170,10 +173,10 @@ class ConnectionsRegistry:
         url = contact.get("profile_url") or contact.get("compose_url") or ""
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        if key not in self.connections:
-            self.sync_contact(clean_name, url)
+        rec = self.get_record(contact)
+        if not rec:
+            rec, _ = self.sync_contact(clean_name, url)
 
-        rec = self.connections[self._make_key(contact)]
         rec["status"] = "SENT"
         rec["sent_at"] = ts
         rec["archetype"] = archetype
@@ -188,15 +191,14 @@ class ConnectionsRegistry:
     def record_skipped(self, contact: dict, reason: str, archetype: str = "",
                        relevance: int | None = None) -> None:
 
-        key = self._make_key(contact)
         clean_name = clean_display_name(contact.get("name", ""))
         url = contact.get("profile_url") or contact.get("compose_url") or ""
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        if key not in self.connections:
-            self.sync_contact(clean_name, url)
+        rec = self.get_record(contact)
+        if not rec:
+            rec, _ = self.sync_contact(clean_name, url)
 
-        rec = self.connections[self._make_key(contact)]
         rec["status"] = "SKIPPED"
         rec["skip_reason"] = reason
         rec["skipped_at"] = ts
@@ -211,15 +213,34 @@ class ConnectionsRegistry:
 
     def record_failed(self, contact: dict, error: str) -> None:
 
-        key = self._make_key(contact)
         clean_name = clean_display_name(contact.get("name", ""))
         url = contact.get("profile_url") or contact.get("compose_url") or ""
 
-        if key in self.connections:
-            self.connections[key]["status"] = "FAILED"
-            self.connections[key]["last_error"] = error
+        rec = self.get_record(contact)
+        if rec:
+            rec["status"] = "FAILED"
+            rec["last_error"] = error
             self.save()
         append_ledger(clean_name, "FAILED", url=url, ledger_file=str(self.ledger_path))
+
+    def record_restricted(self, contact: dict | str, reason: str = "restricted account") -> None:
+
+        clean_name = clean_display_name(contact if isinstance(contact, str) else contact.get("name", ""))
+        url = "" if isinstance(contact, str) else (contact.get("profile_url") or contact.get("compose_url") or "")
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        rec = self.get_record(contact)
+        if not rec:
+            rec, _ = self.sync_contact(clean_name, url)
+
+        rec["status"] = "RESTRICTED"
+        rec["archetype"] = "restricted_account"
+        rec["restricted_at"] = ts
+        rec["restricted_reason"] = reason
+        rec["in_network"] = True
+
+        self.save()
+        append_ledger(clean_name, "RESTRICTED", url=url, ledger_file=str(self.ledger_path))
 
     def mark_removed(self, slug_or_name: str) -> None:
 
@@ -250,12 +271,14 @@ class ConnectionsRegistry:
         total = len(self.connections)
         sent = sum(1 for c in self.connections.values() if c.get("status") == "SENT")
         skipped = sum(1 for c in self.connections.values() if c.get("status") == "SKIPPED")
+        restricted = sum(1 for c in self.connections.values() if c.get("status") == "RESTRICTED")
         unsent = sum(1 for c in self.connections.values() if c.get("status") in ("UNSENT", "FAILED"))
         active = sum(1 for c in self.connections.values() if c.get("in_network", True))
         return {
             "total_tracked": total,
             "sent": sent,
             "skipped": skipped,
+            "restricted": restricted,
             "unsent": unsent,
             "active_in_network": active,
             "sent_today": self.count_sent_today(),

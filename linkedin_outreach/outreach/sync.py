@@ -8,6 +8,7 @@ from outreach.browser import run_bu_script
 from outreach.config import DEFAULT_CONNECTIONS_URL, get_str
 from outreach.harvest import CONNECTIONS_LINKS_JS, SEARCH_SWEEP_JS, search_page_url
 from outreach.registry import ConnectionsRegistry, get_registry
+from outreach.restricted import is_restricted
 
 def sync_network(
     registry: ConnectionsRegistry | None = None,
@@ -45,6 +46,13 @@ def sync_network(
                     href = "https://www.linkedin.com" + href
 
                 if reg.is_done(href) or reg.is_done(raw_name):
+                    continue
+
+                candidate = {"name": raw_name, "profile_url": href, "compose_url": href}
+                restricted, reason = is_restricted(candidate)
+                if restricted:
+                    reg.record_restricted(candidate, reason=reason)
+                    log(f"Restricted connection detected: {raw_name} ({reason}) — recorded as RESTRICTED", "warning")
                     continue
 
                 rec, is_new = reg.sync_contact(raw_name, href, compose_url=href)
@@ -88,6 +96,13 @@ def sync_network(
                 headline = item.get("headline", "")
 
                 if reg.is_done(p_url) or reg.is_done(name):
+                    continue
+
+                candidate = {"name": name, "profile_url": p_url, "headline": headline}
+                restricted, reason = is_restricted(candidate)
+                if restricted:
+                    reg.record_restricted(candidate, reason=reason)
+                    log(f"Restricted connection detected on search page {page}: {name} ({reason}) — recorded as RESTRICTED", "warning")
                     continue
 
                 rec, is_new = reg.sync_contact(name, p_url, headline=headline)

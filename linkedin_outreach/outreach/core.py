@@ -24,6 +24,7 @@ class OutreachResult:
     pending: int = 0
     sent: int = 0
     skipped: int = 0
+    restricted: int = 0
     failed: int = 0
     remaining_budget: int = 0
     items: list[dict] = field(default_factory=list)
@@ -58,6 +59,7 @@ def run_outreach(params: OutreachParams, hooks: OutreachHooks = OutreachHooks())
         pending=pipe_result.unsent_found,
         sent=pipe_result.sent,
         skipped=pipe_result.skipped,
+        restricted=pipe_result.restricted,
         failed=pipe_result.failed,
         remaining_budget=pipe_result.remaining_budget,
         items=pipe_result.items,
