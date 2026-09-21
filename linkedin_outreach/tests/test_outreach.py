@@ -19,7 +19,6 @@ from outreach.messaging import build_message
 from outreach.dispatch import (SEND_JS, THREAD_CHECK_JS, check_existing_thread,
                                 classify, thread_decision)
 from outreach.harvest import CONNECTIONS_LINKS_JS, SEARCH_SWEEP_JS
-from outreach.progress import COUNT_JS
 
 CHILD_HARNESS = '''import json, os, sys, time, base64
 RULES = json.loads(os.environ["TEST_JS_RULES"])
@@ -320,13 +319,6 @@ class TestBrowserUseTemplates(unittest.TestCase):
             CONNECTIONS_LINKS_JS.replace("__CONNECTIONS_URL__", "https://x/"), rules)
         self.assertTrue(any(l.startswith("LINKS:") for l in out))
 
-    def test_count_js_executes(self):
-        rules = [["main.innerText.trim().length", True],
-                 ["count", {"count": "1,234"}]]
-        out, _ = execute_template(COUNT_JS.replace("__CONNECTIONS_URL__", "https://x/"), rules)
-        count_lines = [l for l in out if l.startswith("COUNT:")]
-        self.assertEqual(json.loads(count_lines[0][len("COUNT:"):]), {"count": "1,234"})
-
     def test_no_leftover_placeholders_after_substitution(self):
         script = send_script()
         self.assertNotIn("__URL__", script)
@@ -340,7 +332,7 @@ class TestBrowserUseTemplates(unittest.TestCase):
             self.skipTest("node not available")
         payloads = []
         for name, tmpl in (("SEND", SEND_JS), ("SWEEP", SEARCH_SWEEP_JS),
-                           ("COUNT", COUNT_JS), ("LINKS", CONNECTIONS_LINKS_JS),
+                           ("LINKS", CONNECTIONS_LINKS_JS),
                            ("THREAD", THREAD_CHECK_JS)):
             payloads += [(name, m.group(1)) for m in
                          re.finditer(r"js\(\s*'''(.*?)'''\s*\)", tmpl, re.S)]

@@ -1,10 +1,10 @@
 import subprocess
 
-from outreach.config import BU_TIMEOUT
+from outreach.config import get_int
 
 def run_bu_script(script, timeout=None):
 
-    timeout = timeout or BU_TIMEOUT
+    timeout = timeout or get_int("BU_TIMEOUT", 180)
     try:
         p = subprocess.run(
             ['browser-use'],

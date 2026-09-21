@@ -1,6 +1,5 @@
 import importlib.util
 import os
-import sys
 
 from outreach.config import DEFAULT_PORTFOLIO_URL, MESSAGE_FILE, get_str
 from outreach.names import clean_display_name
@@ -48,10 +47,6 @@ def get_template_for_archetype(archetype=None):
         elif hasattr(mod, "MESSAGE") and mod.MESSAGE:
             return getattr(mod, "MESSAGE"), "data/message.py (general)"
     return DEFAULT_MESSAGE, "built-in default"
-
-def message_template_source(archetype=None):
-
-    return get_template_for_archetype(archetype)
 
 def build_message(name, contact=None):
 

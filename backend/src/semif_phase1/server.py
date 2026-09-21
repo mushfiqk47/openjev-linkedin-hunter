@@ -15,36 +15,52 @@ PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>SemIf — local decisions</title>
 <style>
-:root { color-scheme: light dark; }
+:root { color-scheme: light dark; --accent: light-dark(#2f6fb5, #8fc1f0); }
 body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
 textarea, input[type=text] { width: 100%; box-sizing: border-box; padding: .5rem; font: inherit; }
 textarea { min-height: 6rem; }
 .option { display: flex; gap: .5rem; margin: .35rem 0; }
 .option input { flex: 1; }
 button { font: inherit; padding: .5rem 1rem; cursor: pointer; }
+button:disabled { cursor: progress; opacity: .55; }
 .row { display: flex; gap: .5rem; align-items: center; margin: .5rem 0; }
-.bar { height: 1.1rem; background: #4a90d9; display: inline-block; min-width: 2px; }
+.bar { height: 1.1rem; background: var(--accent); display: inline-block; min-width: 2px; }
 .choice { display: grid; grid-template-columns: 2rem 1fr 4rem; gap: .5rem; align-items: center; margin: .3rem 0; }
 .choice.winner { font-weight: bold; }
-.error { color: #b3261e; }
+.error { color: light-dark(#b3261e, #ff9a91); }
 .muted { opacity: .7; font-size: .9rem; }
 pre { white-space: pre-wrap; background: rgba(127,127,127,.12); padding: .5rem; }
+:where(button, input, textarea, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#progress { height: 2px; overflow: hidden; background: rgba(127,127,127,.2); margin: -.25rem 0 .75rem; }
+#progress i { display: block; height: 100%; width: 40%; background: var(--accent); transform: translateX(-100%); }
+#progress.on i { animation: sweep 1.1s ease-in-out infinite; }
+#out[aria-busy=true] { opacity: .55; }
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) { #progress.on i { animation: none; transform: none; width: 100%; } }
 </style>
 </head>
 <body>
 <h1>SemIf — local decisions</h1>
-<p class="muted">Scores <span id="model">…</span> through your hosted model. Probabilities are conditional on the listed options, not calibrated confidence.</p>
+<p class="muted">Scores <span id="model">connecting…</span> through your hosted model. Probabilities are conditional on the listed options, not calibrated confidence.</p>
 <label>State<textarea id="state">A customer says a password reset succeeded, but every login attempt still returns “account locked”. Two unlock emails were requested and neither arrived.</textarea></label>
 <p><label>Question<input id="question" type="text" value="Which queue should handle this request?" /></label></p>
 <fieldset><legend>Options (2–16)</legend>
 <div id="options"></div>
 <div class="row"><button id="add" type="button">+ add</button><button id="remove" type="button">− remove</button><span id="count" class="muted"></span></div>
 </fieldset>
-<p><button id="run" type="button">Score decision</button> <span id="status" class="muted"></span></p>
+<p><button id="run" type="button" aria-keyshortcuts="Control+Enter Meta+Enter">Score decision</button> <span id="status" class="muted" role="status" aria-live="polite"></span> <span id="elapsed" class="muted" aria-hidden="true"></span></p>
+<div id="progress" hidden aria-hidden="true"><i></i></div>
 <div id="out"></div>
 <script>
 const MAX = 16, MIN = 2;
 const box = document.getElementById("options");
+const out = document.getElementById("out");
+const status = document.getElementById("status");
+const elapsed = document.getElementById("elapsed");
+const runBtn = document.getElementById("run");
+const bar = document.getElementById("progress");
+const model = document.getElementById("model");
+const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 function rows() { return [...box.querySelectorAll(".option")]; }
 function sync() {
   rows().forEach((r, i) => r.querySelector("b").textContent = String.fromCharCode(65 + i));
@@ -61,12 +77,27 @@ function add(value = "") {
 document.getElementById("add").onclick = () => add();
 document.getElementById("remove").onclick = () => { const r = rows(); if (r.length > MIN) r.at(-1).remove(); sync(); };
 ["Account access support", "Billing support", "Close as resolved"].forEach(add);
-fetch("/api/model").then(r => r.json()).then(m => {
-  document.getElementById("model").textContent = m.source + " (" + m.revision + ")";
-});
-document.getElementById("run").onclick = async () => {
-  const out = document.getElementById("out"), status = document.getElementById("status");
-  out.innerHTML = ""; status.textContent = "scoring…";
+fetch("/api/model")
+  .then(r => r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)))
+  .then(m => { model.textContent = m.source + " (" + m.revision + ")"; })
+  .catch(e => { model.textContent = "unavailable: " + e.message + " — is the host server running?"; });
+let scoring = false, ticker = null;
+function setBusy(busy) {
+  scoring = busy;
+  runBtn.disabled = busy;
+  bar.hidden = !busy;
+  bar.classList.toggle("on", busy);
+  out.setAttribute("aria-busy", busy ? "true" : "false");
+  if (ticker) { clearInterval(ticker); ticker = null; }
+  if (busy) {
+    const t0 = performance.now();
+    elapsed.textContent = "scoring… 0.0 s";
+    ticker = setInterval(() => { elapsed.textContent = "scoring… " + ((performance.now() - t0) / 1000).toFixed(1) + " s"; }, 100);
+  } else { elapsed.textContent = ""; }
+}
+async function scoreDecision() {
+  if (scoring) return;
+  setBusy(true);
   const options = rows().map(r => r.querySelector("input").value.trim());
   try {
     const res = await fetch("/api/score", {method: "POST",
@@ -75,15 +106,24 @@ document.getElementById("run").onclick = async () => {
         question: document.getElementById("question").value, options})});
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
-    status.textContent = "done in " + data.total_seconds.toFixed(2) + " s";
     const best = data.probabilities.indexOf(Math.max(...data.probabilities));
     out.innerHTML = data.option_ids.map((id, i) =>
       `<div class="choice${i === best ? " winner" : ""}"><b>${String.fromCharCode(65 + i)}</b>` +
-      `<span><span class="bar" style="width:${(data.probabilities[i] * 100).toFixed(1)}%"></span> ${id}</span>` +
+      `<span><span class="bar" style="width:${(data.probabilities[i] * 100).toFixed(1)}%"></span> ${esc(id)}</span>` +
       `<span>${data.probabilities[i].toFixed(3)}</span></div>`).join("") +
-      `<p class="muted">${data.probability_status}</p><details><summary>raw</summary><pre>${JSON.stringify(data, null, 1).replace(/</g, "&lt;")}</pre></details>`;
-  } catch (e) { status.textContent = ""; out.innerHTML = `<p class="error">${String(e.message || e).replace(/</g, "&lt;")}</p>`; }
-};
+      `<p class="muted">${esc(data.probability_status)}</p><details><summary>raw</summary><pre>${esc(JSON.stringify(data, null, 1))}</pre></details>`;
+    status.textContent = "done in " + data.total_seconds.toFixed(2) + " s";
+  } catch (e) {
+    status.textContent = "";
+    out.innerHTML = `<p class="error" role="alert">${esc(e.message || e)}</p>`;
+  } finally {
+    setBusy(false);
+  }
+}
+runBtn.onclick = scoreDecision;
+document.addEventListener("keydown", e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); scoreDecision(); }
+});
 </script>
 </body>
 </html>
@@ -120,6 +160,8 @@ def score_decision(client, metadata: dict, payload: dict) -> dict:
 
 def make_handler(client, metadata):
     class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"  # keep-alive; every response sets Content-Length
+        disable_nagle_algorithm = True  # keep-alive without Nagle/delayed-ACK stalls
         server_version = "SemIfUI/1.0"
 
         def _send(self, code: int, body: bytes, content_type: str):

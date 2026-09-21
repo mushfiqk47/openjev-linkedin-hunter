@@ -7,7 +7,7 @@ from datetime import date
 from typing import Callable
 
 from outreach.config import (DEFAULT_FILTER_LOW_RELEVANCE, DEFAULT_MIN_RELEVANCE_SCORE,
-                              get_float, get_int)
+                              get_bool, get_float, get_int)
 from outreach.dispatch import (check_existing_thread, send_with_retries, thread_decision)
 from outreach.evaluator import evaluate_contact
 from outreach.messaging import build_message
@@ -24,8 +24,8 @@ class PipelineParams:
     search_only: bool = False
     start_page: int | None = None
     max_pages: int | None = None
-    filter_low_relevance: bool = True
-    min_relevance: int = DEFAULT_MIN_RELEVANCE_SCORE
+    filter_low_relevance: bool | None = None
+    min_relevance: int | None = None
 
 @dataclass
 class PipelineResult:
@@ -89,6 +89,11 @@ def run_pipeline(
     pacing_jitter = get_float("PACING_JITTER", 0.0)
     max_attempts = max(1, get_int("MAX_ATTEMPTS", 2))
     thread_check = get_int("THREAD_CHECK", 1) != 0
+    thread_check_strict = get_bool("THREAD_CHECK_STRICT", False)
+    filter_low = (params.filter_low_relevance if params.filter_low_relevance is not None
+                  else get_bool("FILTER_LOW_RELEVANCE", DEFAULT_FILTER_LOW_RELEVANCE != 0))
+    min_relevance = (params.min_relevance if params.min_relevance is not None
+                     else get_int("MIN_RELEVANCE_SCORE", DEFAULT_MIN_RELEVANCE_SCORE))
 
     to_process = unsent_pool[:remaining_budget]
     log(f"Processing up to {len(to_process)} candidate(s) for outreach...", "info")
@@ -117,8 +122,8 @@ def run_pipeline(
 
         log(f"  [SemIf] Archetype: {archetype} | Relevance: {relevance}% ({eval_res.get('backend')})", "info")
 
-        if params.filter_low_relevance and relevance < params.min_relevance:
-            skip_desc = f"low relevance ({relevance}% < {params.min_relevance}%, {archetype})"
+        if filter_low and relevance < min_relevance:
+            skip_desc = f"low relevance ({relevance}% < {min_relevance}%, {archetype})"
             log(f"  [Skip] {name}: {skip_desc}", "info")
             if not params.dry_run:
                 reg.record_skipped(contact, reason=skip_desc, archetype=archetype, relevance=relevance)
@@ -128,7 +133,7 @@ def run_pipeline(
 
         if thread_check and not params.dry_run:
             has_messages, check_detail = check_existing_thread(contact)
-            skipped, skip_reason = thread_decision(has_messages, check_detail, strict=False)
+            skipped, skip_reason = thread_decision(has_messages, check_detail, strict=thread_check_strict)
             if skipped:
                 log(f"  [Skip] {name}: conversation already exists on LinkedIn.", "info")
                 reg.record_skipped(contact, reason="live thread already had messages", archetype=archetype, relevance=relevance)

@@ -334,3 +334,15 @@
 - Jahidur Rahman Rifat (2026-09-21 04:36:57) - SKIPPED - https://www.linkedin.com/in/jahidur-rahman-rifat-3aaa47245/
 - Mst. Samaunnahar (2026-09-21 04:37:05) - SKIPPED - https://www.linkedin.com/in/samaunnaher-ratna/
 - Md. Rezaul Karim (2026-09-21 04:37:25) - SENT - https://www.linkedin.com/in/md-rezaul-karim-915185a6/
+- Shuvo Kumar Paul (2026-09-21 13:46:56) - FAILED - https://www.linkedin.com/messaging/compose/?profileUrn=urn%3Ali%3Afsd_profile%3AACoAAGO2Lf4BW_kjdwKnzKTY9Z4mqcEsPosoG6M&recipient=ACoAAGO2Lf4BW_kjdwKnzKTY9Z4mqcEsPosoG6M&interop=msgOverlay
+- Md Nasi (2026-09-21 13:47:09) - FAILED - https://www.linkedin.com/in/uxwithnasimul/
+- Md. Abu Jafor (2026-09-21 13:47:23) - FAILED - https://www.linkedin.com/in/abujaforhadi/
+- Maliha Hossain (2026-09-21 13:47:35) - FAILED - https://www.linkedin.com/in/maliha-hossain-790255187/
+- Pollob Sarkar (2026-09-21 13:47:49) - FAILED - https://www.linkedin.com/in/pollob-sarkar-a91a32211/
+- Marjana Rohoman (2026-09-21 13:48:02) - FAILED - https://www.linkedin.com/in/marjana-rohoman-a116b135a/
+- S. M. Abdulla Hil Kafi (2026-09-21 13:48:16) - FAILED - https://www.linkedin.com/in/sakafim/
+- Awlad Hossain (2026-09-21 13:48:29) - FAILED - https://www.linkedin.com/in/awlad21/
+- Md Mostafijur Rahman (2026-09-21 13:48:42) - FAILED - https://www.linkedin.com/in/mmrahman007/
+- Md Rafez Hossain (2026-09-21 13:48:56) - FAILED - https://www.linkedin.com/in/rafez-hossain-digital-product-designer/
+- Sayma Sharmin Shanzida (2026-09-21 13:49:05) - FAILED - https://www.linkedin.com/messaging/compose/?profileUrn=urn%3Ali%3Afsd_profile%3AACoAADXPozYBddvAerQmNVauIdESrzcYxSTxCKI&recipient=ACoAADXPozYBddvAerQmNVauIdESrzcYxSTxCKI&interop=msgOverlay
+- Shobrata Das (2026-09-21 13:49:19) - FAILED - https://www.linkedin.com/in/shobrata-das-722360148/

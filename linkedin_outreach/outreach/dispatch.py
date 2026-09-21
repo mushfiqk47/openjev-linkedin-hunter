@@ -1,18 +1,9 @@
 import base64
 import json
-import os
-import random
 import time
-from datetime import date
 
 from outreach.browser import run_bu_script
-from outreach.config import (CONTACTS_FILE, DEFAULT_FILTER_LOW_RELEVANCE,
-                             DEFAULT_MIN_RELEVANCE_SCORE, get_float, get_int)
-from outreach.evaluator import evaluate_contact
-from outreach.ledger import (append_ledger, count_sent_today, is_messaged,
-                             norm_name, parse_ledger, profile_slug, sent_keys)
 from outreach.messaging import build_message
-from outreach.progress import refresh_progress
 
 SEND_JS = """
 import base64, json, time
@@ -21,14 +12,24 @@ target_url = "__URL__"
 
 if "/messaging/compose" in target_url:
     js(f"window.location.href = '{target_url}'")
+    time.sleep(3.5)
 else:
     js(f"window.location.href = '{target_url}'")
+    time.sleep(3.0)
     msg_target = {}
-    for _ in range(25):
+    for _ in range(20):
         msg_target = js('''(() => {
-            const msgAnchor = Array.from(document.querySelectorAll('a[href*="/messaging/compose"]')).find(a => (a.innerText || '').trim() === 'Message');
+            const msgAnchor = Array.from(document.querySelectorAll('a[href*="/messaging/compose"]')).find(a => {
+                const txt = (a.innerText || '').trim();
+                const aria = (a.getAttribute('aria-label') || '').trim();
+                return txt === 'Message' || aria.startsWith('Message') || txt.startsWith('Message');
+            });
             if (msgAnchor) return { found: true, href: msgAnchor.getAttribute('href') };
-            const msgBtn = Array.from(document.querySelectorAll('button')).find(b => (b.innerText || '').trim() === 'Message');
+            const msgBtn = Array.from(document.querySelectorAll('button')).find(b => {
+                const txt = (b.innerText || '').trim();
+                const aria = (b.getAttribute('aria-label') || '').trim();
+                return txt === 'Message' || aria.startsWith('Message') || txt.startsWith('Message');
+            });
             if (msgBtn) {
                 msgBtn.click();
                 return { found: true, clicked: true };
@@ -37,16 +38,19 @@ else:
         })()''') or {}
         if msg_target.get("found"):
             break
-        time.sleep(0.05)
+        time.sleep(0.5)
 
     if msg_target.get("href"):
         href = msg_target["href"]
         if not href.startswith('http'):
             href = 'https://www.linkedin.com' + href
         js(f"window.location.href = '{href}'")
+        time.sleep(3.5)
+    elif msg_target.get("clicked"):
+        time.sleep(2.5)
 
 editor = {"found": False}
-for attempt in range(40):
+for attempt in range(20):
     editor = js('''(() => {
         const el = document.querySelector('.msg-form__contenteditable');
         if (!el) return { found: false };
@@ -55,7 +59,7 @@ for attempt in range(40):
     })()''') or {"found": False}
     if editor.get("found"):
         break
-    time.sleep(0.05)
+    time.sleep(0.8)
 
 if not editor.get("found"):
     print("RESULT:" + json.dumps({"stage": "editor", "ok": False}))
@@ -74,37 +78,42 @@ else:
             el.dispatchEvent(new Event('change', { bubbles: true }));
         }
     })()''')
+    time.sleep(2.0)
 
     send = {"found": False}
-    for _ in range(25):
+    for _ in range(16):
         send = js('''(() => {
-            const btn = Array.from(document.querySelectorAll('button')).find(b => (b.innerText || '').trim() === 'Send');
+            const btn = Array.from(document.querySelectorAll('button')).find(b => {
+                const t = (b.innerText || '').trim();
+                const a = (b.getAttribute('aria-label') || '').trim();
+                return t === 'Send' || a === 'Send' || (b.type === 'submit' && t.includes('Send'));
+            });
             if (!btn) return { found: false };
             return { found: true, disabled: btn.disabled };
         })()''') or {"found": False}
         if send.get("found") and not send.get("disabled"):
             break
-        time.sleep(0.05)
+        time.sleep(0.5)
 
     if send.get("found") and not send.get("disabled"):
         js('''(() => {
-            const btn = Array.from(document.querySelectorAll('button')).find(b => (b.innerText || '').trim() === 'Send');
+            const btn = Array.from(document.querySelectorAll('button')).find(b => {
+                const t = (b.innerText || '').trim();
+                const a = (b.getAttribute('aria-label') || '').trim();
+                return t === 'Send' || a === 'Send' || (b.type === 'submit' && t.includes('Send'));
+            });
             if (btn) btn.click();
         })()''')
-        state = {}
-        for _ in range(30):
-            time.sleep(0.05)
-            state = js('''(() => {
-                const thread = document.querySelector('.msg-s-message-list');
-                const ed = document.querySelector('.msg-form__contenteditable');
-                return {
-                    afterCount: thread ? thread.querySelectorAll('li').length : 0,
-                    editorEmpty: ed ? ed.innerText.trim() === '' : null,
-                    threadTail: thread ? thread.innerText.slice(-600) : ''
-                };
-            })()''') or {}
-            if state.get("editorEmpty") or state.get("afterCount", 0) > before.get("count", 0):
-                break
+        time.sleep(3.0)
+        state = js('''(() => {
+            const thread = document.querySelector('.msg-s-message-list');
+            const ed = document.querySelector('.msg-form__contenteditable');
+            return {
+                afterCount: thread ? thread.querySelectorAll('li').length : 0,
+                editorEmpty: ed ? ed.innerText.trim() === '' : null,
+                threadTail: thread ? thread.innerText.slice(-600) : ''
+            };
+        })()''') or {}
 
         result = {
             "stage": "sent",
@@ -125,14 +134,24 @@ target_url = '__URL__'
 
 if '/messaging/compose' in target_url:
     js(f"window.location.href = '{target_url}'")
+    time.sleep(3.5)
 else:
     js(f"window.location.href = '{target_url}'")
+    time.sleep(3.0)
     msg_target = {}
-    for _ in range(25):
+    for _ in range(20):
         msg_target = js('''(() => {
-            const msgAnchor = Array.from(document.querySelectorAll('a[href*="/messaging/compose"]')).find(a => (a.innerText || '').trim() === 'Message');
+            const msgAnchor = Array.from(document.querySelectorAll('a[href*="/messaging/compose"]')).find(a => {
+                const txt = (a.innerText || '').trim();
+                const aria = (a.getAttribute('aria-label') || '').trim();
+                return txt === 'Message' || aria.startsWith('Message') || txt.startsWith('Message');
+            });
             if (msgAnchor) return { found: true, href: msgAnchor.getAttribute('href') };
-            const msgBtn = Array.from(document.querySelectorAll('button')).find(b => (b.innerText || '').trim() === 'Message');
+            const msgBtn = Array.from(document.querySelectorAll('button')).find(b => {
+                const txt = (b.innerText || '').trim();
+                const aria = (b.getAttribute('aria-label') || '').trim();
+                return txt === 'Message' || aria.startsWith('Message') || txt.startsWith('Message');
+            });
             if (msgBtn) {
                 msgBtn.click();
                 return { found: true, clicked: true };
@@ -141,23 +160,28 @@ else:
         })()''') or {}
         if msg_target.get('found'):
             break
-        time.sleep(0.05)
+        time.sleep(0.5)
 
     if msg_target.get('href'):
         href = msg_target['href']
         if not href.startswith('http'):
             href = 'https://www.linkedin.com' + href
         js(f"window.location.href = '{href}'")
+        time.sleep(3.5)
+    elif msg_target.get('clicked'):
+        time.sleep(2.5)
 
 ready = False
-for attempt in range(35):
+for attempt in range(20):
     found = js('''(() => {
         return !!(document.querySelector('.msg-s-message-list') || document.querySelector('.msg-form__contenteditable'));
     })()''')
     if found:
         ready = True
         break
-    time.sleep(0.05)
+    time.sleep(0.8)
+
+time.sleep(1.0)
 
 existing = js('''(() => {
     const list = document.querySelector('.msg-s-message-list');
@@ -252,145 +276,7 @@ def send_with_retries(contact, max_attempts):
         if err and err.strip():
             detail += f" | stderr: {err.strip()[:150]}"
         if attempt < max_attempts:
-            print(f"    attempt {attempt} failed ({detail}); retrying...")
+            print(f"    attempt {attempt} failed ({detail}); retrying in 3.0s...")
+            time.sleep(3.0)
     return status, detail
 
-def load_pending(entries, sent_names, sent_slugs, start_idx=0):
-
-    if not os.path.exists(CONTACTS_FILE):
-        return None
-    try:
-        with open(CONTACTS_FILE, encoding="utf-8") as f:
-            contacts = json.load(f)
-    except Exception:
-        return None
-    pending, seen = [], set()
-    for c in contacts:
-        key = profile_slug(c.get("profile_url") or c.get("compose_url") or "") or norm_name(c.get("name", ""))
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        if not is_messaged(c, entries, sent_names, sent_slugs):
-            pending.append(c)
-    return pending[start_idx:]
-
-def run(limit=None, start_idx=None, dry_run=False):
-
-    today = date.today().strftime("%Y-%m-%d")
-    pacing = get_float("PACING", 0.0)
-    pacing_jitter = get_float("PACING_JITTER", 0.0)
-    max_attempts = max(1, get_int("MAX_ATTEMPTS", 2))
-    start_idx = start_idx if start_idx is not None else get_int("START_IDX", 0)
-    daily_limit = limit if limit is not None else get_int("DAILY_LIMIT", 15)
-
-    thread_check = get_int("THREAD_CHECK", 1) != 0
-    thread_check_strict = get_int("THREAD_CHECK_STRICT", 0) != 0
-    filter_low_relevance = get_int("FILTER_LOW_RELEVANCE", DEFAULT_FILTER_LOW_RELEVANCE) != 0
-    min_relevance = get_int("MIN_RELEVANCE_SCORE", DEFAULT_MIN_RELEVANCE_SCORE)
-
-    entries = parse_ledger()
-    sent_names, sent_slugs = sent_keys(entries)
-    sent_today = count_sent_today(entries)
-    remaining_budget = daily_limit - sent_today
-
-    if not os.path.exists(CONTACTS_FILE):
-        print(f"NO_CONTACTS_FILE: {CONTACTS_FILE} is missing - harvesting needed first.")
-        refresh_progress()
-        return []
-    pending = load_pending(entries, sent_names, sent_slugs, start_idx)
-    if pending is None:
-        print(f"CONTACTS_FILE_ERROR: could not read contacts.json.")
-        refresh_progress()
-        return []
-
-    if remaining_budget <= 0:
-        print(f"DAILY_LIMIT_REACHED: {sent_today} already SENT today ({today}); limit is {daily_limit}.")
-        print("Stop for today, or raise DAILY_LIMIT in data/.env / environment if you accept the risk.")
-        refresh_progress()
-        return []
-    if not pending:
-        print("NOTHING_TO_SEND: every contact in contacts.json is already logged in the ledger.")
-        refresh_progress()
-        return []
-    if len(pending) > remaining_budget:
-        print(f"BUDGET_WARNING: {len(pending)} pending but only {remaining_budget} left today "
-              f"(limit {daily_limit}). Sending the first {remaining_budget}.")
-        pending = pending[:remaining_budget]
-
-    mode_str = " [DRY-RUN SIMULATION]" if dry_run else ""
-    print(f"PLAN{mode_str}: send to {len(pending)} contacts (already messaged: {len(sent_names)}, "
-          f"sent today: {sent_today}, budget left: {remaining_budget}, pacing: {pacing}-{round(pacing * pacing_jitter)}s jittered, "
-          f"thread check: {'on' if thread_check else 'off'}{' (strict)' if thread_check and thread_check_strict else ''}, "
-          f"semif filter: {'on (>=' + str(min_relevance) + '%)' if filter_low_relevance else 'off'})")
-
-    results = []
-    for i, c in enumerate(pending):
-        name = c["name"]
-        url = c.get("profile_url") or c.get("compose_url") or ""
-        print(f"\n===== CONTACT {i + 1}/{len(pending)}: {name} =====")
-
-        eval_res = evaluate_contact(c)
-        c["archetype"] = eval_res.get("archetype", "general")
-        c["relevance"] = eval_res.get("relevance", 60)
-        c["eval_reason"] = eval_res.get("reason", "")
-        print(f"    [SemIf] Archetype: {c['archetype']} | Relevance: {c['relevance']}% ({eval_res.get('backend')})")
-        if c["eval_reason"]:
-            print(f"    [SemIf Detail] {c['eval_reason']}")
-
-        if filter_low_relevance and c["relevance"] < min_relevance:
-            status = "SKIPPED"
-            detail = f"low relevance score ({c['relevance']}% < {min_relevance}%, {c['archetype']})"
-            print(f"    [skip] {detail}")
-            if not dry_run:
-                append_ledger(name, status, url=url)
-            results.append({"name": name, "status": status, "detail": detail})
-            continue
-
-        skipped = False
-        status, detail = "FAILED", "not attempted"
-        if thread_check and not dry_run:
-            has_messages, check_detail = check_existing_thread(c)
-            skipped, reason = thread_decision(has_messages, check_detail, strict=thread_check_strict)
-            if skipped:
-                status, detail = "SKIPPED", reason
-                print(f"    [skip] {reason}")
-            elif has_messages is None:
-                print(f"    [warn] thread check inconclusive ({check_detail}); sending (ledger still dedups)")
-        if not skipped:
-            if dry_run:
-                status = "SIMULATED"
-                preview = build_message(name, c).replace('\n', ' ')[:90]
-                detail = f"dry-run: would send [{c['archetype']}]: {preview}..."
-                print(f"    [DRY-RUN] {detail}")
-            else:
-                try:
-                    status, detail = send_with_retries(c, max_attempts)
-                except Exception as e:
-                    status, detail = "FAILED", f"unexpected error: {e}"
-        if not dry_run:
-            append_ledger(name, status, url=url)
-            print(f"--> Status: {status} ({detail}) | logged to Complete.md")
-        else:
-            print(f"--> Status: {status} ({detail}) [simulated - ledger unchanged]")
-        results.append({"name": name, "status": status, "detail": detail})
-        if not dry_run and i < len(pending) - 1 and pacing > 0:
-            delay = random.uniform(pacing, pacing * max(1.0, pacing_jitter))
-            print(f"----- pacing {round(delay, 1)}s before next contact -----")
-            time.sleep(delay)
-
-    print("\n==================================================")
-    print("             OUTREACH BATCH COMPLETE              ")
-    print("==================================================")
-    for r in results:
-        print(f"  - {r['name']}: {r['status']} ({r['detail']})")
-    try:
-        progress = refresh_progress()
-        remaining_str = progress["remaining"] if progress["remaining"] is not None else "unknown"
-        print("--------------------------------------------------")
-        print(f"Progress: {progress['messaged_unique']} messaged of "
-              f"{progress['total_connections'] if progress['total_connections'] is not None else 'unknown'} "
-              f"connections ({remaining_str} remaining) - saved to progress.txt")
-    except Exception as e:
-        print(f"[WARN] could not refresh progress.txt: {e}")
-    print("==================================================")
-    return results

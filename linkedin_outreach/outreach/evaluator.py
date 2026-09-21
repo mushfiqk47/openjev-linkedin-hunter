@@ -1,14 +1,8 @@
-import json
 import os
 import sys
-import urllib.error
-import urllib.request
 
 from outreach.config import (
     BACKEND_SRC,
-    CV_FILE,
-    DEFAULT_FILTER_LOW_RELEVANCE,
-    DEFAULT_MIN_RELEVANCE_SCORE,
     DEFAULT_SEMIF_BASE_URL,
     DEFAULT_SEMIF_ENABLED,
     DEFAULT_SEMIF_MODEL,
@@ -39,31 +33,6 @@ DISQUALIFIED_HEADLINE_TOKENS = [
     "fashion designer", "textile designer", "apparel merchandiser",
     "civil engineer", "mechanical engineer", "electrical engineer",
 ]
-
-_cv_cache = []
-
-def load_candidate_profile():
-
-    if _cv_cache:
-        return _cv_cache[0]
-    profile = (
-        "Mushfiq Kabir — UI/UX and Graphic Designer. Experienced in SaaS platforms, "
-        "mobile apps, Figma workflows, design systems, and wireframing/prototyping. "
-        "Searching for job or project-based work."
-    )
-    if os.path.exists(CV_FILE):
-        try:
-            with open(CV_FILE, encoding="utf-8") as f:
-                data = json.load(f)
-                basics = data.get("basics", {})
-                summary = data.get("summary", "")
-                label = basics.get("label", "UI/UX Designer")
-                name = basics.get("name", "Mushfiq Kabir")
-                profile = f"{name} — {label}. {summary}"
-        except Exception:
-            pass
-    _cv_cache.append(profile)
-    return profile
 
 def bm25_prescreen(headline):
 
@@ -211,26 +180,6 @@ def get_judge():
         return _judge_instance
     except Exception:
         return None
-
-def reset_judge():
-    global _judge_instance
-    _judge_instance = None
-
-def check_semif_connection(base_url=None, timeout=2):
-
-    url = (base_url or get_str("SEMIF_BASE_URL", DEFAULT_SEMIF_BASE_URL)).rstrip("/") + "/models"
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "SemIf-Preflight/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            if resp.status == 200:
-                data = json.loads(resp.read().decode("utf-8"))
-                models = [m.get("id") for m in data.get("data", []) if m.get("id")]
-                return True, f"LM Studio reachable ({len(models)} model(s): {', '.join(models[:3])})"
-            return False, f"LM Studio returned status {resp.status}"
-    except urllib.error.URLError as e:
-        return False, f"Connection refused or timed out ({e.reason})"
-    except Exception as e:
-        return False, str(e)
 
 def evaluate_contact(contact, judge=None):
 

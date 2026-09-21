@@ -6,9 +6,9 @@ An autonomous AI agent designed for automated LinkedIn job discovery, newsfeed h
 
 - **Multi-Axis SemIf Scoring**: Evaluates each opportunity along four weighted axes:
   - `role_fit` (35%): Direct alignment with UI/UX & Product Design focus.
-  - `tools_fit` (25%): Hands-on expertise with Figma, Design Systems, and prototyping.
+  - `tools_fit` (30%): Hands-on expertise with Figma, Design Systems, and prototyping.
   - `level_fit` (20%): Mid-to-senior qualification without unreasonable executive mandates.
-  - `domain_fit` (20%): Relevance to web applications, SaaS, and mobile products.
+  - `domain_fit` (15%): Relevance to web applications, SaaS, and mobile products.
 - **Extract-First Scraping**: Snapshots listings and metadata in a single fast CDP execution without detached-element errors.
 - **Dynamic News Feed Fallback**: If standard job search queries return fewer matches than requested, the agent automatically transitions to scanning the LinkedIn News Feed for real-time hiring posts.
 - **Zero Human Delay Option**: Configurable pacing to run at maximum machine speed (`ENABLE_HUMAN_DELAYS=0`).

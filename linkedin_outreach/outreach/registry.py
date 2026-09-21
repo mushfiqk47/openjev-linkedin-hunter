@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime
 import json
-import os
 from pathlib import Path
 
 from outreach.config import LEDGER_FILE, REGISTRY_FILE
@@ -244,14 +243,14 @@ class ConnectionsRegistry:
 
         return [
             rec for rec in self.connections.values()
-            if rec.get("status") == "UNSENT" and rec.get("in_network", True)
+            if rec.get("status") in ("UNSENT", "FAILED") and rec.get("in_network", True)
         ]
 
     def get_stats(self) -> dict:
         total = len(self.connections)
         sent = sum(1 for c in self.connections.values() if c.get("status") == "SENT")
         skipped = sum(1 for c in self.connections.values() if c.get("status") == "SKIPPED")
-        unsent = sum(1 for c in self.connections.values() if c.get("status") == "UNSENT")
+        unsent = sum(1 for c in self.connections.values() if c.get("status") in ("UNSENT", "FAILED"))
         active = sum(1 for c in self.connections.values() if c.get("in_network", True))
         return {
             "total_tracked": total,

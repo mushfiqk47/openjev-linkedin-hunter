@@ -88,7 +88,6 @@ WORK_TYPES = {
 
 LLM_BASE_URL = get_str("LLM_BASE_URL", get_str("SEMIF_REMOTE_BASE_URL", "http://localhost:1234/v1"))
 LLM_MODEL = get_str("LLM_MODEL", get_str("SEMIF_REMOTE_MODEL", "qwen3.5-4b"))
-LLM_TIMEOUT = get_float("LLM_TIMEOUT", 45.0)
 
 DEFAULT_MIN_SCORE = get_int("DEFAULT_MIN_SCORE", 70)
 DEFAULT_MIN_MATCHES = get_int("DAILY_TARGET_MATCHES", get_int("DEFAULT_MIN_MATCHES", 10))
@@ -102,7 +101,6 @@ HUMAN_DELAY_MIN = get_float("HUMAN_DELAY_MIN", 0.0)
 HUMAN_DELAY_MAX = get_float("HUMAN_DELAY_MAX", 0.0)
 CARD_CLICK_DELAY_MIN = get_float("CARD_CLICK_DELAY_MIN", 0.0)
 CARD_CLICK_DELAY_MAX = get_float("CARD_CLICK_DELAY_MAX", 0.0)
-SCROLL_BATCH = get_int("SCROLL_BATCH", 4)
 
 SKILL_VOCAB = [
     "figma", "adobe xd", "illustrator", "photoshop", "sketch", "framer",

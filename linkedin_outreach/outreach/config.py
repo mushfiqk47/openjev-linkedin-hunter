@@ -12,21 +12,16 @@ def data_file(filename):
         raise ValueError(f"path escapes data directory: {full}")
     return full
 
-CONTACTS_FILE = data_file("contacts.json")
 LEDGER_FILE = data_file("Complete.md")
 REGISTRY_FILE = data_file("connections_registry.json")
 PROGRESS_FILE = data_file("progress.txt")
 TOTAL_FILE = data_file("total_connections.txt")
-ENV_FILE = data_file(".env")
 MESSAGE_FILE = data_file("message.py")
-
-BU_TIMEOUT = int(os.environ.get("BU_TIMEOUT", "180"))
 
 DEFAULT_PORTFOLIO_URL = "https://mushfiqkabiruix.vercel.app/"
 DEFAULT_CONNECTIONS_URL = "https://www.linkedin.com/mynetwork/invite-connect/connections/"
 
 BACKEND_SRC = os.path.abspath(os.path.join(ROOT_DIR, "..", "backend", "src"))
-CV_FILE = os.path.abspath(os.path.join(ROOT_DIR, "..", "Mushfiq_Kabir_CV.json"))
 
 DEFAULT_SEMIF_ENABLED = 1
 DEFAULT_SEMIF_BASE_URL = "http://localhost:1234/v1"

@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
 
-from outreach.pipeline import PipelineParams, PipelineResult, run_pipeline
-from outreach.registry import ConnectionsRegistry, get_registry
+from outreach.pipeline import PipelineParams, run_pipeline
+from outreach.registry import get_registry
 
 @dataclass
 class OutreachParams:

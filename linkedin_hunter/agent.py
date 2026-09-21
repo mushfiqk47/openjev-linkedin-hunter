@@ -31,9 +31,7 @@ from linkedin_hunter.config import (
     ENABLE_HUMAN_DELAYS,
     LLM_BASE_URL,
     LLM_MODEL,
-    get_bool,
     get_int,
-    get_str,
     load_env,
 )
 from linkedin_hunter.cv_loader import load_cv_data

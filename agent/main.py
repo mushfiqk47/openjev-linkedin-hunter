@@ -1,4 +1,7 @@
+import subprocess
 import sys
+from pathlib import Path
+
 from linkedin_hunter.storage import JobStore
 from linkedin_hunter.hunter import main as run_hunter
 from linkedin_hunter.login import main as run_login

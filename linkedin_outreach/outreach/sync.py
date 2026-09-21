@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Callable
 
 from outreach.browser import run_bu_script
-from outreach.config import DEFAULT_CONNECTIONS_URL, get_int, get_str
+from outreach.config import DEFAULT_CONNECTIONS_URL, get_str
 from outreach.harvest import CONNECTIONS_LINKS_JS, SEARCH_SWEEP_JS, search_page_url
 from outreach.registry import ConnectionsRegistry, get_registry
 

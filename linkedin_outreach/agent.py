@@ -7,7 +7,7 @@ import sys
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from outreach.config import get_bool, get_int, get_str, load_env
+from outreach.config import get_bool, get_int, load_env
 from outreach.core import OutreachHooks, OutreachParams, run_outreach
 
 def build_parser():
